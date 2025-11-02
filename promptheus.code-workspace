@@ -1,0 +1,32 @@
+{
+  "folders": [
+    {
+      "name": "📦 Promptheus (Public)",
+      "path": "."
+    },
+    {
+      "name": "🔒 Promptheus Content (Private)",
+      "path": "../promptheus-content"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/.pytest_cache": true,
+      "**/*.pyc": true,
+      "**/.mypy_cache": true,
+      "**/.ruff_cache": true
+    },
+    "python.analysis.extraPaths": [
+      "${workspaceFolder:📦 Promptheus (Public)}/src"
+    ],
+    "terminal.integrated.cwd": "${workspaceFolder:📦 Promptheus (Public)}"
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "charliermarsh.ruff"
+    ]
+  }
+}

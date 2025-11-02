@@ -34,6 +34,11 @@ async def validate_database():
         lesson_repo = LessonRepository(db)
         lessons = lesson_repo.find_by_skill_level(SkillLevel.BEGINNER)
 
+        if len(lessons) == 0:
+            logger.warning("No lessons found in database!")
+            logger.warning("Run: uv run python ../promptheus-content/scripts/seed_lessons.py")
+            raise AssertionError("Database not seeded with lessons")
+
         assert len(lessons) == 5, f"Expected 5 lessons, found {len(lessons)}"
 
         logger.info(f"Found {len(lessons)} beginner lessons:")

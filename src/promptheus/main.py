@@ -64,10 +64,30 @@ async def main() -> None:
         CallbackQueryHandler(handlers.lesson_callback, pattern="^lesson_[0-9]+$")
     )
     application.add_handler(
+        CallbackQueryHandler(handlers.lesson_start_callback, pattern="^lesson_start_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(handlers.theory_next_callback, pattern="^theory_next_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(handlers.examples_callback, pattern="^examples_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(handlers.practice_callback, pattern="^practice_")
+    )
+    application.add_handler(
         CallbackQueryHandler(handlers.lesson_list_callback, pattern="^lesson_list$")
     )
     application.add_handler(
         CallbackQueryHandler(handlers.menu_callback, pattern="^menu$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(handlers.continue_callback, pattern="^continue$")
+    )
+
+    # Message handler for text (user prompt submissions)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.text_message_handler)
     )
 
     # Error handler

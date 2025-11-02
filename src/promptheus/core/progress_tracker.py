@@ -34,6 +34,18 @@ class ProgressTracker:
         self.progress_repo.increment_attempts(user_id, lesson_id)
         self.progress_repo.update_score(user_id, lesson_id, score)
 
+    def increment_attempts(self, user_id: int, lesson_id: int) -> None:
+        """Increment attempt counter for a lesson."""
+        self.progress_repo.increment_attempts(user_id, lesson_id)
+
+    def complete_lesson(self, user_id: int, lesson_id: int, score: int) -> None:
+        """Mark lesson as completed with final score."""
+        progress = self.progress_repo.find_by_user_and_lesson(user_id, lesson_id)
+        if progress:
+            progress.status = LessonStatus.COMPLETED  # type: ignore
+            progress.last_score = score  # type: ignore
+            progress.completed_at = datetime.utcnow()  # type: ignore
+
     def get_progress_summary(self, user_id: int) -> dict[str, int | float]:
         """Get progress summary for user."""
         progress_records = self.progress_repo.find_by_user(user_id)

@@ -24,6 +24,7 @@
 - Test Telegram bot (separate from production)
 - Comprehensive test suite for validation
 - Docker for local containerized testing
+- Private `promptheus-content` repository (for lesson data)
 
 #### 2.2 Production
 **Purpose**: Serving real users
@@ -73,6 +74,7 @@ Monitoring & Logging Stack
   - api.telegram.org (443)
   - openrouter.ai (443)
   - Database endpoint (5432 for PostgreSQL)
+  - github.com (443, for private content repo access)
 - **Firewall**: Only necessary ports
 
 #### 3.3 SSL/TLS
@@ -99,13 +101,15 @@ WEBHOOK_URL=https://your-domain.com/webhook  # for webhook mode
 **Secrets Management**:
 - Development: `.env` file (do not commit to Git)
 - Production: Cloud secrets manager or env variables in deployment
+- Content Repository: SSH deploy keys or personal access tokens for CI/CD
 
 #### 4.2 Initial Deployment
 
 **Step 1: Infrastructure Preparation**
 ```bash
-# Clone repository
+# Clone repositories
 git clone https://github.com/l0kifs/promptheus.git
+git clone https://github.com/l0kifs/promptheus-content.git  # Private repo
 cd promptheus
 
 # Check Python version
@@ -139,8 +143,9 @@ docker compose build
 # Apply migrations
 alembic upgrade head
 
-# Seed initial data (lessons)
-python scripts/seed_lessons.py
+# Seed initial data (lessons) - requires private content repo
+# Clone private repo: git clone https://github.com/l0kifs/promptheus-content.git
+python ../promptheus-content/scripts/seed_lessons.py
 ```
 
 **Step 5: Application Start**

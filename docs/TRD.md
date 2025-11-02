@@ -161,15 +161,13 @@
 
 ### 6. MVP Scope
 
-#### 6.1 Core Features (Must Have)
-- User registration and onboarding
-- Initial skill assessment (5 questions)
-- 5 foundational lessons:
+#### 5.1 MVP Scope
+- 5 foundational lessons (managed in private promptheus-content repository):
   1. Introduction to Prompt Engineering
-  2. Role Definition and Context
-  3. Clear Instructions and Objectives
-  4. Output Format Specification
-  5. Iterative Refinement
+  2. Defining AI Roles
+  3. Providing Context
+  4. Setting Clear Objectives
+  5. Specifying Output Format
 - Practice exercises (1 per lesson)
 - AI-powered feedback on user prompts
 - Progress tracking and resume capability

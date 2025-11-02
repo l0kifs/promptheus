@@ -61,7 +61,16 @@ Edit `.env` and add your credentials:
 - `TELEGRAM_BOT_TOKEN`: Your Telegram bot token from BotFather
 - `OPENROUTER_API_KEY`: Your OpenRouter API key
 
-### 5. Initialize Database
+### 5. Clone Content Repository
+
+```bash
+# Clone the private content repository (must have access)
+cd ..
+git clone https://github.com/l0kifs/promptheus-content.git
+cd promptheus
+```
+
+### 6. Initialize Database
 
 ```bash
 # Create data directory
@@ -70,19 +79,33 @@ mkdir -p data
 # Run migrations (creates tables)
 alembic upgrade head
 
-# Seed lessons
-python scripts/seed_lessons.py
+# Seed lessons from private repo
+uv run python ../promptheus-content/scripts/seed_lessons.py
 ```
 
-### 6. Run the Bot
+### 7. Run the Bot
 
 ```bash
-python -m promptheus.main
+uv run python -m promptheus.main
 ```
 
 The bot will start and log: `Bot is running. Press Ctrl+C to stop.`
 
-### 7. Test the Bot
+### 8. VS Code Workspace (Optional)
+
+For convenient multi-repo development:
+
+```bash
+# Open the workspace file in VS Code
+code promptheus.code-workspace
+```
+
+This opens both repositories (public + private content) in one window with:
+- ✅ Shared settings and extensions
+- ✅ Integrated terminal in main project directory
+- ✅ Easy navigation between code and content
+
+### 9. Test the Bot
 
 1. Open Telegram and find your bot by username
 2. Send `/start` to begin
@@ -91,10 +114,37 @@ The bot will start and log: `Bot is running. Press Ctrl+C to stop.`
 
 ## Development
 
+### Multi-Repository Setup
+
+This project uses **two repositories** to separate open-source code from proprietary content:
+
+**📦 promptheus (public)** - Application framework
+- [https://github.com/l0kifs/promptheus](https://github.com/l0kifs/promptheus)
+- Contains: application code, database schema, bot logic, documentation
+
+**🔒 promptheus-content (private)** - Educational content
+- [https://github.com/l0kifs/promptheus-content](https://github.com/l0kifs/promptheus-content)
+- Contains: lessons, assessments, exercises, proprietary materials
+
+### VS Code Workspace
+
+For the best development experience, use the provided workspace file:
+
+```bash
+# Open the workspace in VS Code
+code promptheus.code-workspace
+```
+
+This workspace configuration:
+- ✅ Shows both repos side-by-side in one window
+- ✅ Proper Python path resolution
+- ✅ Recommended extensions
+- ✅ Filters out cache directories
+
 ### Project Structure
 
 ```
-promptheus/
+promptheus/                  # PUBLIC REPO
 ├── src/promptheus/          # Main application code
 │   ├── ai/                  # AI integration (OpenRouter)
 │   ├── bot/                 # Telegram bot handlers
@@ -102,9 +152,14 @@ promptheus/
 │   ├── config/              # Configuration
 │   └── data/                # Data models & repositories
 ├── alembic/                 # Database migrations
-├── scripts/                 # Utility scripts
+├── scripts/                 # Utility scripts (no content)
 ├── tests/                   # Test suite
 └── docs/                    # Documentation
+
+promptheus-content/          # PRIVATE REPO (separate)
+├── scripts/
+│   └── seed_lessons.py      # Lesson seeding script
+└── README.md
 ```
 
 ### Running Tests

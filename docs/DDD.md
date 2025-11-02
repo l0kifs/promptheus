@@ -68,6 +68,8 @@
 #### 3.2 Lesson
 **Purpose**: Store learning content metadata and structure
 
+**Note**: Lesson content is managed via private `promptheus-content` repository and seeded into database.
+
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | SERIAL | PK, NOT NULL | Auto-increment lesson ID |
@@ -125,6 +127,7 @@
 - Each skill level has distinct `order_index` sequence (1, 2, 3...)
 - Tags must match predefined categories (techniques, use_cases, topics)
 - Content structured for mobile-optimized delivery (50-80 word chunks)
+- **Content Source**: Lessons seeded from private `promptheus-content` repository
 
 ---
 

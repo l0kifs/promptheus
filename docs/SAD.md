@@ -87,7 +87,7 @@
 
 **Components**:
 - **User Repository**: CRUD operations for user data, skill level, goals
-- **Lesson Repository**: Retrieve lessons by skill level, tags, order
+- **Lesson Repository**: Retrieve lessons by skill level, tags, order (seeded from private content repo)
 - **Progress Repository**: Track lesson status, attempts, scores
 - **Session Repository**: Manage active session state, context data
 

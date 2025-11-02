@@ -91,3 +91,77 @@ class AssessmentEngine:
             "correct": correct_count,
             "total": total,
         }
+
+    async def evaluate_user_prompt(
+        self, user_prompt: str, lesson_id: int
+    ) -> dict[str, int | list[str]]:
+        """Evaluate user's prompt submission for a practice exercise.
+
+        Args:
+            user_prompt: The prompt submitted by the user
+            lesson_id: The ID of the current lesson
+
+        Returns:
+            Dictionary with score (0-10), strengths, and improvements
+        """
+        # Create evaluation prompt
+        evaluation_prompt = f"""You are an expert prompt engineering instructor. Evaluate this student's prompt.
+
+Student's Prompt: "{user_prompt}"
+
+Provide a structured evaluation:
+1. Score (0-10): Rate the prompt quality
+2. Strengths: What's good about it (2-3 points)
+3. Improvements: What could be better (2-3 points)
+
+Focus on: role definition, context clarity, specific instructions, and output format.
+
+Respond in this exact JSON format:
+{{
+  "score": <number>,
+  "strengths": ["strength1", "strength2"],
+  "improvements": ["improvement1", "improvement2"]
+}}"""
+
+        try:
+            # Call AI to evaluate using the correct method
+            response = await self.ai_client.call_with_fallback(
+                prompt=evaluation_prompt,
+                max_tokens=512,
+                temperature=0.3,
+            )
+
+            # Parse response - try to extract JSON
+            import json
+            import re
+
+            # Try to find JSON in response
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                return {
+                    "score": int(result.get("score", 5)),
+                    "strengths": result.get("strengths", []),
+                    "improvements": result.get("improvements", []),
+                }
+            else:
+                # Fallback if JSON parsing fails
+                return {
+                    "score": 5,
+                    "strengths": ["Good attempt at creating a prompt"],
+                    "improvements": [
+                        "Try adding more specific context",
+                        "Consider defining a clear role for the AI",
+                    ],
+                }
+
+        except Exception:
+            # Fallback on any error
+            return {
+                "score": 5,
+                "strengths": ["You submitted a prompt"],
+                "improvements": [
+                    "Add more context and clarity",
+                    "Define a specific role for the AI",
+                ],
+            }

@@ -106,13 +106,19 @@
 ```
 - id (PK)
 - title
-- skill_level
+- skill_level (enum: beginner/intermediate/advanced)
 - order_index
+- tags (JSON array: ["technique", "use_case", "topic"])
 - theory_content (JSON)
 - examples (JSON)
 - exercises (JSON)
 - created_at
 ```
+
+**Tag Categories:**
+- **Techniques**: `zero-shot`, `few-shot`, `role-based`, `chain-of-thought`, `context-heavy`, `formatting`
+- **Use Cases**: `academic`, `professional`, `creative`, `general`
+- **Topics**: `role-definition`, `context-provision`, `clear-objectives`, `output-formatting`, `iterative-refinement`, `error-detection`
 
 #### 4.3 UserProgress
 ```
@@ -220,10 +226,13 @@ TEMPERATURE_FEEDBACK=0.5
 - **Data Errors**: Invalid state, missing data → Reset to safe state
 
 #### 8.2 Logging Requirements
-- Structured logging (JSON format)
+- Structured logging with loguru
 - Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - Include: timestamp, user_id, action, error details
 - Rotation: Daily, max 30 days retention
+- JSON serialization for structured data
+- Colored output for development environment
+- Context binding for request tracing
 
 ### 9. Testing Requirements
 
@@ -253,8 +262,8 @@ TEMPERATURE_FEEDBACK=0.5
 #### 10.2 CI/CD Pipeline
 - Automated testing on PR
 - Lint and type checking (ruff, mypy)
-- Automated deployment to staging
-- Manual promotion to production
+- Automated build and test on merge to develop
+- Manual deployment to production with approval
 
 ### 11. Monitoring and Observability
 
@@ -287,7 +296,8 @@ alembic>=1.12  # Database migrations
 pydantic>=2.0
 pydantic-settings>=2.0
 python-dotenv>=1.0
-aiohttp>=3.9
+httpx>=0.27  # Modern async HTTP client
+loguru>=0.7  # Simplified logging with better defaults
 ```
 
 #### 12.2 Development Dependencies

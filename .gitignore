@@ -210,3 +210,4 @@ __marimo__/
 # Data directory
 src/prompt_clipboard/data/
 !src/prompt_clipboard/data/.gitkeep
+logs/

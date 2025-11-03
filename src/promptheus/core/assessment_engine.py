@@ -1,5 +1,7 @@
 """Assessment engine for skill level evaluation."""
 
+from loguru import logger
+
 from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.data.models import SkillLevel
 
@@ -63,6 +65,7 @@ class AssessmentEngine:
 
     async def evaluate_answers(self, answers: list[str]) -> dict[str, int | str]:
         """Evaluate user answers and determine skill level."""
+        logger.info("Evaluating assessment answers", answer_count=len(answers))
         questions = self.get_assessment_questions()
         correct_answers = [q["correct"] for q in questions]
 
@@ -85,6 +88,14 @@ class AssessmentEngine:
         else:
             level = SkillLevel.BEGINNER
 
+        logger.info(
+            "Assessment evaluated",
+            score=score,
+            correct=correct_count,
+            total=total,
+            level=level.value,
+        )
+
         return {
             "score": score,
             "level": level.value,
@@ -104,6 +115,8 @@ class AssessmentEngine:
         Returns:
             Dictionary with score (0-10), strengths, and improvements
         """
+        logger.info("Evaluating user prompt", lesson_id=lesson_id, prompt_length=len(user_prompt))
+
         # Create evaluation prompt
         evaluation_prompt = f"""You are an expert prompt engineering instructor. Evaluate this student's prompt.
 
@@ -125,11 +138,14 @@ Respond in this exact JSON format:
 
         try:
             # Call AI to evaluate using the correct method
+            logger.debug("Calling AI for prompt evaluation", lesson_id=lesson_id)
             response = await self.ai_client.call_with_fallback(
                 prompt=evaluation_prompt,
                 max_tokens=512,
                 temperature=0.3,
             )
+
+            logger.debug("AI evaluation received", lesson_id=lesson_id)
 
             # Parse response - try to extract JSON
             import json
@@ -139,13 +155,24 @@ Respond in this exact JSON format:
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
+                score = int(result.get("score", 5))
+                strengths = result.get("strengths", [])
+                improvements = result.get("improvements", [])
+
+                logger.info(
+                    "Prompt evaluation successful",
+                    lesson_id=lesson_id,
+                    score=score,
+                )
+
                 return {
-                    "score": int(result.get("score", 5)),
-                    "strengths": result.get("strengths", []),
-                    "improvements": result.get("improvements", []),
+                    "score": score,
+                    "strengths": strengths,
+                    "improvements": improvements,
                 }
             else:
                 # Fallback if JSON parsing fails
+                logger.warning("Failed to parse AI response as JSON, using fallback", lesson_id=lesson_id)
                 return {
                     "score": 5,
                     "strengths": ["Good attempt at creating a prompt"],
@@ -155,8 +182,9 @@ Respond in this exact JSON format:
                     ],
                 }
 
-        except Exception:
+        except Exception as e:
             # Fallback on any error
+            logger.error("Error evaluating prompt, using fallback", lesson_id=lesson_id, error=str(e))
             return {
                 "score": 5,
                 "strengths": ["You submitted a prompt"],

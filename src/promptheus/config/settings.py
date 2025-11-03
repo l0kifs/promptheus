@@ -23,16 +23,16 @@ class Settings(BaseSettings):
     # OpenRouter AI
     openrouter_api_key: str = Field(..., description="OpenRouter API key")
     ai_model_primary: str = Field(
-        default="meta-llama/llama-3.1-8b-instruct:free",
-        description="Primary AI model",
+        default="meta-llama/llama-4-scout:free",
+        description="Primary AI model (109B MoE, 512K context)",
     )
     ai_model_fallback: str = Field(
-        default="google/gemini-2.0-flash-exp:free",
-        description="Fallback AI model",
+        default="google/gemini-2.5-pro-exp:free",
+        description="Fallback AI model (1M context, advanced reasoning)",
     )
     ai_model_alternative: str = Field(
-        default="mistralai/mistral-7b-instruct:free",
-        description="Alternative AI model",
+        default="mistralai/mistral-small-3.1-24b-instruct:free",
+        description="Alternative AI model (96K context, function calling)",
     )
 
     # Model parameters

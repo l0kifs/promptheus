@@ -10,10 +10,6 @@ from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.bot.message_formatter import MessageFormatter
 from promptheus.core.assessment_engine import AssessmentEngine
 from promptheus.core.learning_flow_orchestrator import LearningFlowOrchestrator
-from promptheus.core.progress_tracker import ProgressTracker
-from promptheus.data.database import get_db
-from promptheus.data.models import LearningGoal, LessonStatus, SkillLevel
-from promptheus.data.repositories import LessonRepository, UserRepository
 
 
 class BotHandlers:
@@ -27,9 +23,7 @@ class BotHandlers:
         self.ai_client = ai_client
         self.formatter = MessageFormatter()
 
-    async def start_command(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command."""
         if not update.effective_user or not update.message:
             logger.warning("Invalid /start command: missing user or message")
@@ -45,7 +39,9 @@ class BotHandlers:
 
             if user:
                 # Returning user
-                logger.info("Returning user detected", user_id=user_id, skill_level=user.skill_level.value)  # type: ignore
+                logger.info(
+                    "Returning user detected", user_id=user_id, skill_level=user.skill_level.value
+                )  # type: ignore
                 keyboard = [
                     [InlineKeyboardButton("▶️ Continue", callback_data="continue")],
                     [InlineKeyboardButton("📚 Menu", callback_data="menu")],
@@ -57,11 +53,7 @@ class BotHandlers:
                 # New user
                 logger.info("New user detected, showing welcome", user_id=user_id)
                 keyboard = [
-                    [
-                        InlineKeyboardButton(
-                            "▶️ Start Learning", callback_data="start_learning"
-                        )
-                    ]
+                    [InlineKeyboardButton("▶️ Start Learning", callback_data="start_learning")]
                 ]
                 await update.message.reply_text(
                     self.formatter.format_welcome(),
@@ -78,9 +70,7 @@ class BotHandlers:
 
         await update.callback_query.answer()
 
-        keyboard = [
-            [InlineKeyboardButton("🚀 Start Test", callback_data="start_assessment")]
-        ]
+        keyboard = [[InlineKeyboardButton("🚀 Start Test", callback_data="start_assessment")]]
 
         await update.callback_query.edit_message_text(
             self.formatter.format_assessment_intro(),
@@ -114,9 +104,7 @@ class BotHandlers:
         # Show first question
         await self._show_question(update, context)
 
-    async def _show_question(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def _show_question(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show current assessment question."""
         if not update.callback_query:
             return
@@ -130,7 +118,8 @@ class BotHandlers:
 
         question = questions[current]
         keyboard = [
-            [InlineKeyboardButton(opt, callback_data=f"answer_{opt[0]}")] for opt in question["options"]  # type: ignore
+            [InlineKeyboardButton(opt, callback_data=f"answer_{opt[0]}")]
+            for opt in question["options"]  # type: ignore
         ]
 
         await update.callback_query.edit_message_text(
@@ -144,9 +133,7 @@ class BotHandlers:
             parse_mode="Markdown",
         )
 
-    async def answer_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def answer_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle answer to assessment question."""
         if not update.effective_user or not update.callback_query:
             return
@@ -161,9 +148,7 @@ class BotHandlers:
         # Show next question
         await self._show_question(update, context)
 
-    async def _finish_assessment(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def _finish_assessment(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Finish assessment and show goal selection."""
         if not update.effective_user or not update.callback_query:
             return
@@ -189,9 +174,7 @@ class BotHandlers:
             parse_mode="Markdown",
         )
 
-    async def goal_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def goal_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle goal selection."""
         if not update.effective_user or not update.callback_query:
             logger.warning("Invalid goal callback: missing user or callback")
@@ -261,7 +244,9 @@ class BotHandlers:
 
             # Show path
             if lessons:
-                logger.info("Generated personalized path", user_id=user_id, lesson_count=len(lessons))
+                logger.info(
+                    "Generated personalized path", user_id=user_id, lesson_count=len(lessons)
+                )
                 keyboard = [
                     [
                         InlineKeyboardButton(
@@ -272,9 +257,7 @@ class BotHandlers:
                 ]
 
                 await update.callback_query.edit_message_text(
-                    self.formatter.format_personalized_path(
-                        skill_level_str, goal.value, lessons
-                    ),
+                    self.formatter.format_personalized_path(skill_level_str, goal.value, lessons),
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode="Markdown",
                 )
@@ -365,9 +348,7 @@ class BotHandlers:
                     parse_mode="Markdown",
                 )
 
-    async def lesson_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def lesson_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle lesson selection."""
         if not update.effective_user or not update.callback_query:
             return
@@ -404,7 +385,8 @@ class BotHandlers:
 
             await update.callback_query.edit_message_text(
                 self.formatter.format_lesson_start(
-                    lesson.title, lesson.order_index  # type: ignore
+                    lesson.title,
+                    lesson.order_index,  # type: ignore
                 ),
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown",
@@ -434,7 +416,7 @@ class BotHandlers:
             # Get lessons for user's skill level
             lesson_repo = LessonRepository(db)
             lessons = lesson_repo.find_by_skill_level(user.skill_level)  # type: ignore
-            
+
             if not lessons:
                 # Fallback to beginner lessons
                 lessons = lesson_repo.find_by_skill_level(SkillLevel.BEGINNER)
@@ -448,15 +430,11 @@ class BotHandlers:
 
             # Format lesson list
             lesson_list = "\n".join(
-                [f"{i+1}. {lesson.title}" for i, lesson in enumerate(lessons)]
+                [f"{i + 1}. {lesson.title}" for i, lesson in enumerate(lessons)]
             )
 
             keyboard = [
-                [
-                    InlineKeyboardButton(
-                        f"▶️ Lesson {i+1}", callback_data=f"lesson_{lesson.id}"
-                    )
-                ]
+                [InlineKeyboardButton(f"▶️ Lesson {i + 1}", callback_data=f"lesson_{lesson.id}")]
                 for i, lesson in enumerate(lessons[:5])  # Show first 5
             ]
             keyboard.append([InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")])
@@ -574,7 +552,11 @@ class BotHandlers:
                 )
             else:
                 keyboard.append(
-                    [InlineKeyboardButton("Continue to Examples ➡️", callback_data=f"examples_{lesson_id}")]
+                    [
+                        InlineKeyboardButton(
+                            "Continue to Examples ➡️", callback_data=f"examples_{lesson_id}"
+                        )
+                    ]
                 )
             keyboard.append(
                 [InlineKeyboardButton("⬅️ Back", callback_data=f"theory_prev_{lesson_id}")]
@@ -609,15 +591,16 @@ class BotHandlers:
                 [InlineKeyboardButton("▶️ Start", callback_data=f"lesson_start_{lesson_id}")],
                 [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
             ]
-            
+
             with get_db() as db:
                 lesson_repo = LessonRepository(db)
                 lesson = lesson_repo.find_by_id(lesson_id)
-                
+
                 if lesson:
                     await update.callback_query.edit_message_text(
                         self.formatter.format_lesson_start(
-                            lesson.title, lesson.order_index  # type: ignore
+                            lesson.title,
+                            lesson.order_index,  # type: ignore
                         ),
                         reply_markup=InlineKeyboardMarkup(keyboard),
                         parse_mode="Markdown",
@@ -657,9 +640,13 @@ class BotHandlers:
                 )
             else:
                 keyboard.append(
-                    [InlineKeyboardButton("Continue to Examples ➡️", callback_data=f"examples_{lesson_id}")]
+                    [
+                        InlineKeyboardButton(
+                            "Continue to Examples ➡️", callback_data=f"examples_{lesson_id}"
+                        )
+                    ]
                 )
-            
+
             # Only show back button if not on first section
             if prev_section > 0:
                 keyboard.append(
@@ -667,7 +654,11 @@ class BotHandlers:
                 )
             else:
                 keyboard.append(
-                    [InlineKeyboardButton("⬅️ Back to Lesson Start", callback_data=f"lesson_{lesson_id}")]
+                    [
+                        InlineKeyboardButton(
+                            "⬅️ Back to Lesson Start", callback_data=f"lesson_{lesson_id}"
+                        )
+                    ]
                 )
 
             await update.callback_query.edit_message_text(
@@ -676,9 +667,7 @@ class BotHandlers:
                 parse_mode="Markdown",
             )
 
-    async def examples_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def examples_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle examples section."""
         if not update.effective_user or not update.callback_query:
             return
@@ -744,9 +733,7 @@ class BotHandlers:
             parse_mode="Markdown",
         )
 
-    async def practice_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def practice_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle practice section."""
         if not update.effective_user or not update.callback_query:
             return
@@ -801,9 +788,7 @@ class BotHandlers:
                 parse_mode="Markdown",
             )
 
-    async def hint_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def hint_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle hint request during practice."""
         if not update.effective_user or not update.callback_query:
             return
@@ -835,7 +820,9 @@ class BotHandlers:
                 hint_text += "Now try writing your own prompt based on this example!"
             else:
                 hint_text += "Think about the lesson concepts and apply them to the scenario.\n\n"
-                hint_text += "Remember: Be specific, provide context, and structure your prompt clearly."
+                hint_text += (
+                    "Remember: Be specific, provide context, and structure your prompt clearly."
+                )
 
             keyboard = [
                 [InlineKeyboardButton("⬅️ Back to Exercise", callback_data=f"practice_{lesson_id}")],
@@ -848,9 +835,7 @@ class BotHandlers:
                 parse_mode="Markdown",
             )
 
-    async def skip_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def skip_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle skip exercise request - allows user to skip without marking lesson complete."""
         if not update.effective_user or not update.callback_query:
             return
@@ -865,7 +850,7 @@ class BotHandlers:
         with get_db() as db:
             # DO NOT mark lesson as completed when skipping
             # User can only complete lesson by achieving appropriate score
-            
+
             # Get next lesson or show options
             user_repo = UserRepository(db)
             user = user_repo.find_by_telegram_id(user_id)
@@ -892,7 +877,11 @@ class BotHandlers:
                                 "➡️ Next Lesson", callback_data=f"lesson_{next_lesson.id}"
                             )
                         ],
-                        [InlineKeyboardButton("🔄 Try Exercise Again", callback_data=f"practice_{lesson_id}")],
+                        [
+                            InlineKeyboardButton(
+                                "🔄 Try Exercise Again", callback_data=f"practice_{lesson_id}"
+                            )
+                        ],
                         [InlineKeyboardButton("📋 All Lessons", callback_data="lesson_list")],
                         [InlineKeyboardButton("📚 Menu", callback_data="menu")],
                     ]
@@ -905,7 +894,11 @@ class BotHandlers:
                 else:
                     # No more lessons
                     keyboard = [
-                        [InlineKeyboardButton("🔄 Try Exercise Again", callback_data=f"practice_{lesson_id}")],
+                        [
+                            InlineKeyboardButton(
+                                "🔄 Try Exercise Again", callback_data=f"practice_{lesson_id}"
+                            )
+                        ],
                         [InlineKeyboardButton("📋 All Lessons", callback_data="lesson_list")],
                         [InlineKeyboardButton("📊 View Progress", callback_data="progress")],
                         [InlineKeyboardButton("📚 Menu", callback_data="menu")],
@@ -982,9 +975,7 @@ class BotHandlers:
         try:
             # Get AI feedback
             assessment_engine = AssessmentEngine(self.ai_client)
-            feedback = await assessment_engine.evaluate_user_prompt(
-                user_prompt, lesson_id
-            )
+            feedback = await assessment_engine.evaluate_user_prompt(user_prompt, lesson_id)
 
             logger.info(
                 "Prompt evaluation complete",
@@ -1007,7 +998,7 @@ class BotHandlers:
                     score = int(score_value)
                 else:
                     score = 0
-                    
+
                 if score >= 7:
                     progress_tracker.complete_lesson(user_id, lesson_id, score)
                     logger.info(
@@ -1038,7 +1029,11 @@ class BotHandlers:
             keyboard = []
             if score >= 7:
                 keyboard.append(
-                    [InlineKeyboardButton("🎉 Lesson Complete!", callback_data=f"lesson_complete_{lesson_id}")]
+                    [
+                        InlineKeyboardButton(
+                            "🎉 Lesson Complete!", callback_data=f"lesson_complete_{lesson_id}"
+                        )
+                    ]
                 )
             else:
                 keyboard.append(
@@ -1066,9 +1061,7 @@ class BotHandlers:
                 parse_mode="Markdown",
             )
 
-    async def menu_command(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /menu command."""
         if not update.effective_user or not update.message:
             return
@@ -1085,9 +1078,7 @@ class BotHandlers:
             parse_mode="Markdown",
         )
 
-    async def menu_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle menu callback."""
         if not update.effective_user or not update.callback_query:
             return
@@ -1106,9 +1097,7 @@ class BotHandlers:
             parse_mode="Markdown",
         )
 
-    async def continue_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def continue_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle continue learning callback."""
         if not update.effective_user or not update.callback_query:
             return
@@ -1137,11 +1126,7 @@ class BotHandlers:
 
                 if lesson:
                     keyboard = [
-                        [
-                            InlineKeyboardButton(
-                                "▶️ Resume", callback_data=f"lesson_{lesson.id}"
-                            )
-                        ],
+                        [InlineKeyboardButton("▶️ Resume", callback_data=f"lesson_{lesson.id}")],
                         [InlineKeyboardButton("📋 All Lessons", callback_data="lesson_list")],
                         [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
                     ]
@@ -1168,15 +1153,11 @@ class BotHandlers:
 
             # Format lesson list
             lesson_list = "\n".join(
-                [f"{i+1}. {lesson.title}" for i, lesson in enumerate(lessons)]
+                [f"{i + 1}. {lesson.title}" for i, lesson in enumerate(lessons)]
             )
 
             keyboard = [
-                [
-                    InlineKeyboardButton(
-                        f"▶️ Lesson {i+1}", callback_data=f"lesson_{lesson.id}"
-                    )
-                ]
+                [InlineKeyboardButton(f"▶️ Lesson {i + 1}", callback_data=f"lesson_{lesson.id}")]
                 for i, lesson in enumerate(lessons[:5])  # Show first 5
             ]
             keyboard.append([InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")])
@@ -1187,9 +1168,7 @@ class BotHandlers:
                 parse_mode="Markdown",
             )
 
-    async def progress_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def progress_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle progress view request."""
         if not update.effective_user or not update.callback_query:
             return
@@ -1245,8 +1224,6 @@ class BotHandlers:
                 parse_mode="Markdown",
             )
 
-    async def error_handler(
-        self, update: object, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle errors."""
         logger.error(f"Exception while handling an update: {context.error}")

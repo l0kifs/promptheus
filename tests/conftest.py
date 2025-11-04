@@ -8,11 +8,14 @@ from promptheus.data.database import Base
 from promptheus.data.models import LearningGoal, Lesson, SkillLevel, User
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def db_engine():
     """Create in-memory SQLite engine for testing."""
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+
+    # Create all tables
     Base.metadata.create_all(engine)
+
     yield engine
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -21,14 +24,10 @@ def db_engine():
 @pytest.fixture
 def db_session(db_engine):
     """Create database session for testing."""
-    SessionLocal = sessionmaker(bind=db_engine)
-    session = SessionLocal()
+    session_local = sessionmaker(bind=db_engine)
+    session = session_local()
     try:
         yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
     finally:
         session.close()
 
@@ -36,8 +35,11 @@ def db_session(db_engine):
 @pytest.fixture
 def sample_user(db_session: Session) -> User:
     """Create a sample user."""
+    import random
+
+    telegram_id = random.randint(100000, 999999)
     user = User(
-        telegram_id=12345,
+        telegram_id=telegram_id,
         username="testuser",
         skill_level=SkillLevel.BEGINNER,
         learning_goal=LearningGoal.PROFESSIONAL,

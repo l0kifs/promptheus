@@ -8,6 +8,7 @@ You are an experienced software engineer. Apply industry best practices.
 3. **Context-first:** Study existing code, use it as reference
 4. **Robustness:** Handle edge cases, validate input, log errors
 5. **Minimalism:** The simplest solution that meets requirements
+6. **File size limit:** Max 300 lines per code file - decompose into logical components if exceeded
 
 ### 📋 Before Starting Work
 - Analyze project structure and existing patterns

@@ -2,9 +2,20 @@
 
 import enum
 from datetime import datetime
-from typing import Any
 
-from sqlalchemy import JSON, BigInteger, Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from promptheus.data.database import Base
@@ -57,10 +68,20 @@ class User(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    __table_args__ = (
+        CheckConstraint(
+            "assessment_score IS NULL OR (assessment_score >= 0 AND assessment_score <= 100)",
+            name="check_assessment_score_range",
+        ),
+        Index("ix_user_created_at", "created_at"),
+    )
+
     # Relationships
     current_lesson = relationship("Lesson", foreign_keys=[current_lesson_id])
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
-    session = relationship("UserSession", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    session = relationship(
+        "UserSession", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class Lesson(Base):
@@ -77,6 +98,11 @@ class Lesson(Base):
     examples = Column(JSON, nullable=False)
     exercises = Column(JSON, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("skill_level", "order_index", name="uq_lesson_skill_level_order_index"),
+        Index("ix_lesson_skill_level_order_index", "skill_level", "order_index"),
+    )
 
     # Relationships
     progress = relationship("UserProgress", back_populates="lesson")
@@ -95,6 +121,15 @@ class UserProgress(Base):
     last_score = Column(Integer, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
+    __table_args__ = (
+        UniqueConstraint("user_id", "lesson_id", name="uq_user_progress_user_lesson"),
+        CheckConstraint(
+            "last_score IS NULL OR (last_score >= 0 AND last_score <= 100)",
+            name="check_last_score_range",
+        ),
+        Index("ix_user_progress_user_id_status", "user_id", "status"),
+    )
+
     # Relationships
     user = relationship("User", back_populates="progress")
     lesson = relationship("Lesson", back_populates="progress")
@@ -109,6 +144,8 @@ class UserSession(Base):
     state = Column(Enum(SessionState), nullable=False)
     context_data = Column(JSON, nullable=False, default=dict)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (Index("ix_user_session_updated_at", "updated_at"),)
 
     # Relationships
     user = relationship("User", back_populates="session")

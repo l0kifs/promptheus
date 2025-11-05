@@ -205,18 +205,18 @@ alembic downgrade -1
 
 All configuration is done via environment variables in `.env`:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token | Required |
-| `OPENROUTER_API_KEY` | OpenRouter API key | Required |
-| `DATABASE_URL` | Database connection URL | `sqlite:///./data/promptheus.db` |
-| `ENVIRONMENT` | Environment (development/production) | `development` |
-| `LOG_LEVEL` | Logging level | `INFO` |
-| `BOT_MODE` | Bot operating mode (polling/webhook) | `polling` |
-| `WEBHOOK_URL` | Webhook URL (required for webhook mode) | None |
-| `WEBHOOK_SECRET` | Webhook secret token | None |
-| `WEBHOOK_PORT` | Webhook server port | 8443 |
-| `WEBHOOK_PATH` | Webhook endpoint path | `/webhook` |
+| Variable             | Description                             | Default                          |
+| -------------------- | --------------------------------------- | -------------------------------- |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token                      | Required                         |
+| `OPENROUTER_API_KEY` | OpenRouter API key                      | Required                         |
+| `DATABASE_URL`       | Database connection URL                 | `sqlite:///./data/promptheus.db` |
+| `ENVIRONMENT`        | Environment (development/production)    | `development`                    |
+| `LOG_LEVEL`          | Logging level                           | `INFO`                           |
+| `BOT_MODE`           | Bot operating mode (polling/webhook)    | `polling`                        |
+| `WEBHOOK_URL`        | Webhook URL (required for webhook mode) | None                             |
+| `WEBHOOK_SECRET`     | Webhook secret token                    | None                             |
+| `WEBHOOK_PORT`       | Webhook server port                     | 8443                             |
+| `WEBHOOK_PATH`       | Webhook endpoint path                   | `/webhook`                       |
 
 See `.env.example` for all available options.
 

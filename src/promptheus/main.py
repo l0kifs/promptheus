@@ -129,7 +129,9 @@ async def start_bot_webhook(application: Application, settings: Settings) -> Non
             webhook_url=settings.webhook_url,
             secret_token=settings.webhook_secret,
         )
-        logger.info("Webhook server started", port=settings.webhook_port, path=settings.webhook_path)
+        logger.info(
+            "Webhook server started", port=settings.webhook_port, path=settings.webhook_path
+        )
     except Exception as e:
         logger.error("Failed to start webhook server", error=str(e))
         raise
@@ -256,7 +258,7 @@ async def main() -> None:
 
             # Stop telegram bot (safe for both polling and webhook modes)
             try:
-                if hasattr(application, 'updater') and application.updater:
+                if hasattr(application, "updater") and application.updater:
                     await application.updater.stop()  # type: ignore
             except Exception:
                 pass  # updater may not exist in webhook mode

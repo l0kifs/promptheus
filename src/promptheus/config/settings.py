@@ -34,8 +34,10 @@ class Settings(BaseSettings):
         default="mistralai/mistral-small-3.1-24b-instruct:free",
         description="Alternative AI model (96K context, function calling)",
     )
-
-    # Model parameters
+    ai_model_lightweight: str = Field(
+        default="qwen/qwen2.5-vl-3b-instruct:free",
+        description="Lightweight AI model (3B, multimodal for examples)",
+    )
     max_tokens_default: int = Field(default=1024, description="Default max tokens")
     max_tokens_feedback: int = Field(default=512, description="Max tokens for feedback")
     max_tokens_assessment: int = Field(default=256, description="Max tokens for assessment")

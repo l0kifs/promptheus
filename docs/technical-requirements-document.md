@@ -15,8 +15,9 @@
 - **Bot Framework**: python-telegram-bot (v20+)
 - **AI API**: OpenRouter API
 - **Database**: SQLite (MVP) / PostgreSQL (production)
-- **ORM**: SQLAlchemy
-- **Async Runtime**: asyncio
+- **ORM**: SQLAlchemy (async)
+- **Async Runtime**: asyncio with async/await patterns throughout
+- **Dependency Injection**: Container-based component management
 - **Configuration**: python-dotenv, Pydantic Settings
 
 ### 2. Functional Requirements
@@ -139,12 +140,19 @@
 - updated_at
 ```
 
+#### 4.5 Data Access Patterns
+- **Repository Pattern**: Async repositories with session management
+- **Dependency Injection**: Constructor injection for all components
+- **Session Management**: Async session makers with proper lifecycle
+- **Transaction Handling**: Async context managers for database operations
+
 ### 5. API Integrations
 
-#### 5.1 Telegram Bot API
+#### 5.1 Telegram Bot API + Dependency Injection
 - **Methods**: sendMessage, editMessageText, answerCallbackQuery
 - **Webhook vs Polling**: Polling for MVP, webhook for production
 - **Message Types**: Text, inline keyboards, markdown formatting
+- **Architecture**: Handlers receive dependencies via constructor injection
 
 #### 5.2 OpenRouter API
 - **Endpoints**: `/api/v1/chat/completions`
@@ -289,13 +297,14 @@ TEMPERATURE_FEEDBACK=0.5
 ```
 python-telegram-bot>=20.0
 openai>=1.0  # For OpenRouter compatibility
-sqlalchemy>=2.0
+sqlalchemy>=2.0  # Async SQLAlchemy
 alembic>=1.12  # Database migrations
 pydantic>=2.0
 pydantic-settings>=2.0
 python-dotenv>=1.0
 httpx>=0.27  # Modern async HTTP client
 loguru>=0.7  # Simplified logging with better defaults
+aiosqlite>=0.19  # Async SQLite driver
 ```
 
 #### 12.2 Development Dependencies

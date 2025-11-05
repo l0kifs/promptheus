@@ -46,10 +46,11 @@
 - **Callback Query Handler**: Manages inline keyboard button clicks
 - **State Manager**: Tracks user conversation state (onboarding/learning/practicing/menu)
 - **Message Formatter**: Formats outgoing messages with markdown, emojis, keyboards
+- **Dependency Injection**: All handlers receive dependencies via constructor injection
 
 **Key Interactions**:
 - Receives events from Telegram Bot API
-- Delegates business logic to Application Core
+- Delegates business logic to Application Core via injected dependencies
 - Returns formatted responses to Telegram
 
 #### 2.2 Application Core Layer
@@ -83,32 +84,38 @@
 - Handles errors with automatic fallback
 
 #### 2.4 Data Access Layer
-**Responsibility**: Abstract database operations
+**Responsibility**: Abstract database operations with async patterns
 
 **Components**:
-- **User Repository**: CRUD operations for user data, skill level, goals
-- **Lesson Repository**: Retrieve lessons by skill level, tags, order (seeded from private content repo)
-- **Progress Repository**: Track lesson status, attempts, scores
-- **Session Repository**: Manage active session state, context data
+- **Async User Repository**: CRUD operations for user data, skill level, goals
+- **Async Lesson Repository**: Retrieve lessons by skill level, tags, order (seeded from private content repo)
+- **Async Progress Repository**: Track lesson status, attempts, scores
+- **Async Session Repository**: Manage active session state, context data
+- **Dependency Container**: Manages async session creation and component lifecycle
 
 **Key Interactions**:
 - Receives data queries from Application Core
-- Executes SQLAlchemy queries against database
-- Returns domain models
+- Executes async SQLAlchemy queries against database
+- Returns domain models with proper session management
 - Handles transactions and error recovery
 
 ### 3. Component Interactions
 
 #### 3.1 User Onboarding Flow
 ```
-User → Telegram → Bot Handler → Flow Orchestrator
+User → Telegram → Bot Handler (with injected dependencies)
                                       ↓
                               Assessment Engine ← AI Integration
                                       ↓
-                              User Repository → Database
+                              Async User Repository → Database
                                       ↓
                           ← Personalized Path Response
 ```
+
+**Dependency Flow**:
+- Bot Handler receives AssessmentEngine, AI Client via constructor injection
+- AssessmentEngine receives AI Client via constructor injection
+- Repositories created with async sessions from Dependency Container
 
 #### 3.2 Lesson Delivery Flow
 ```
@@ -137,9 +144,9 @@ User Prompt → Bot Handler → Assessment Engine
 ### 4. Data Flow
 
 #### 4.1 State Management
-- **Session State**: In-memory cache with database persistence
-- **User Progress**: Write-through cache to database
-- **Lesson Content**: Read-through cache with 1-hour TTL
+- **Session State**: Database-persisted in UserSession.context_data (stateless application)
+- **User Progress**: Direct database writes with async repositories
+- **Lesson Content**: Cached with database backing for consistency
 
 #### 4.2 Message Flow
 1. Incoming: Telegram → Handler → State Manager → Core Logic
@@ -148,15 +155,15 @@ User Prompt → Bot Handler → Assessment Engine
 
 ### 5. Technology Mapping
 
-| Layer | Technologies |
-|-------|--------------|
-| Bot Interface | python-telegram-bot, asyncio |
-| Application Core | Python 3.11+, Pydantic |
-| AI Integration | httpx, OpenAI SDK (OpenRouter-compatible) |
-| Data Access | SQLAlchemy, Alembic |
-| Database | SQLite (MVP) / PostgreSQL (production) |
-| Configuration | python-dotenv, Pydantic Settings |
-| Logging | loguru |
+| Layer            | Technologies                                                |
+| ---------------- | ----------------------------------------------------------- |
+| Bot Interface    | python-telegram-bot, asyncio                                |
+| Application Core | Python 3.11+, Pydantic                                      |
+| AI Integration   | httpx, OpenAI SDK (OpenRouter-compatible)                   |
+| Data Access      | SQLAlchemy (async), Alembic, Dependency Injection Container |
+| Database         | SQLite (MVP) / PostgreSQL (production)                      |
+| Configuration    | python-dotenv, Pydantic Settings                            |
+| Logging          | loguru                                                      |
 
 ### 6. Scalability Considerations
 
@@ -237,11 +244,12 @@ Monitoring Stack (metrics, logs, traces)
 
 ### 11. Key Design Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| Layered Architecture | Clear separation of concerns, easier testing and maintenance |
-| Async/Await Pattern | Handle multiple users concurrently without threading complexity |
-| Repository Pattern | Abstract database implementation, enable easy migration (SQLite → PostgreSQL) |
-| Free Tier AI Models | Zero AI costs for MVP, validate demand before paid tier investment |
-| Polling (MVP) | Simpler deployment, webhook for production with proper infrastructure |
-| SQLite → PostgreSQL | Start simple, migrate when scaling requires concurrent write support |
+| Decision                       | Rationale                                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------- |
+| Layered Architecture           | Clear separation of concerns, easier testing and maintenance                              |
+| Async/Await Pattern            | Handle multiple users concurrently without threading complexity                           |
+| Repository Pattern + DI        | Abstract database implementation, enable easy migration and testing (SQLite → PostgreSQL) |
+| Dependency Injection Container | Manage component lifecycle and dependencies for testability and maintainability           |
+| Free Tier AI Models            | Zero AI costs for MVP, validate demand before paid tier investment                        |
+| Polling (MVP)                  | Simpler deployment, webhook for production with proper infrastructure                     |
+| SQLite → PostgreSQL            | Start simple, migrate when scaling requires concurrent write support                      |

@@ -147,39 +147,57 @@ from promptheus.core.learning_flow import LearningFlowOrchestrator
 ```
 
 ### 3.2 Repository Pattern
-- **Purpose:** Abstract database operations
-- **Naming:** `{Entity}Repository`
-- **Methods:** CRUD verbs (`create`, `find`, `update`, `delete`)
+- **Purpose:** Abstract async database operations
+- **Naming:** `Async{Entity}Repository`
+- **Methods:** Async CRUD verbs (`create`, `find`, `update`, `delete`)
+- **Session Management:** Repositories receive async sessions via dependency injection
 
 ```python
-# ✅ Correct
-class UserRepository:
-    def find_by_telegram_id(self, telegram_id: int) -> User | None:
-    def create(self, user: User) -> User:
-    def update_skill_level(self, user_id: int, level: SkillLevel) -> None:
+# ✅ Correct - Async repository with session injection
+class AsyncUserRepository:
+    def __init__(self, session: AsyncSession):
+        self._session = session
+    
+    async def find_by_telegram_id(self, telegram_id: int) -> User | None:
+        result = await self._session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def create(self, user: User) -> User:
+        self._session.add(user)
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
 
-# ❌ Wrong
-class UserDB:  # Vague naming
-    def get(self, id):  # Ambiguous
-    def save(self, user):  # Too generic
+# ❌ Wrong - Synchronous repository
+class UserRepository:  # Missing Async prefix
+    def find_by_telegram_id(self, telegram_id: int) -> User | None:  # Not async
+        return self.db.query(User).filter(...).first()  # Blocking call
 ```
 
 ### 3.3 Dependency Injection
-- **Pattern:** Constructor injection for dependencies
-- **Avoid:** Global state, singletons (except config)
+- **Pattern:** Constructor injection for dependencies via DependencyContainer
+- **Container:** Singleton pattern for managing component lifecycle
+- **Avoid:** Global state, singletons (except config and container)
 
 ```python
-# ✅ Correct
+# ✅ Correct - Constructor injection via container
 class AssessmentEngine:
     def __init__(
         self,
         ai_client: OpenRouterClient,
-        user_repo: UserRepository
+        user_repo: AsyncUserRepository
     ):
         self._ai_client = ai_client
         self._user_repo = user_repo
 
-# ❌ Wrong
+# Container usage
+container = DependencyContainer.get_instance()
+await container.initialize()
+assessment_engine = container.get_component("assessment_engine")
+
+# ❌ Wrong - Hard dependencies
 class AssessmentEngine:
     def __init__(self):
         self._ai_client = OpenRouterClient()  # Hard dependency
@@ -241,30 +259,50 @@ def set_skill_level(user, level):
 ## 5. Asynchronous Code
 
 ### 5.1 Async/Await Pattern
-- **Usage:** I/O-bound operations (API calls, database queries)
-- **Naming:** No special prefix needed
-- **Consistency:** All layers async or provide async wrappers
+- **Usage:** All I/O-bound operations (API calls, database queries)
+- **Naming:** No special prefix needed for async functions
+- **Consistency:** All layers async with proper session management
+- **Container:** Dependency container manages async session lifecycle
 
 ```python
-# ✅ Correct
+# ✅ Correct - Async throughout with container
 async def fetch_lesson_content(lesson_id: int) -> LessonContent:
     """Fetch lesson content from database."""
-    async with db_session() as session:
-        return await lesson_repo.find_by_id(session, lesson_id)
+    container = DependencyContainer.get_instance()
+    lesson_repo = await container.get_lesson_repository()
+    return await lesson_repo.find_by_id(lesson_id)
 
-# ❌ Wrong
-async def async_fetch_lesson(id):  # Redundant prefix
-    return lesson_repo.find_by_id(id)  # Forgot await
+# ✅ Correct - Handler with injected dependencies
+class BotHandlers:
+    def __init__(
+        self,
+        ai_client: OpenRouterClient,
+        assessment_engine: AssessmentEngine,
+        learning_orchestrator: LearningFlowOrchestrator,
+        progress_tracker: ProgressTracker
+    ):
+        self._ai_client = ai_client
+        self._assessment_engine = assessment_engine
+        # ... other dependencies
+
+# ❌ Wrong - Blocking operations in async context
+async def fetch_lesson(id):  # Missing type hints
+    lesson_repo = UserRepository(db)  # Synchronous repository
+    return lesson_repo.find_by_id(id)  # Blocking call, no await
 ```
 
 ### 5.2 Error Handling in Async
 - **Pattern:** Try-except within async functions
 - **Timeout:** Set reasonable timeouts for external calls
-- **Cleanup:** Use `async with` for resource management
+- **Cleanup:** Use dependency container for proper resource management
+- **Session Handling:** Async sessions managed by container
 
 ```python
-# ✅ Correct
+# ✅ Correct - Async error handling with container
 async def call_ai_api(prompt: str) -> str:
+    container = DependencyContainer.get_instance()
+    ai_client = container.get_component("ai_client")
+    
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(API_URL, json={"prompt": prompt})
@@ -374,28 +412,40 @@ def testCalculateScore():  # Wrong convention
 
 ### 7.3 Test Coverage
 - **Target:** >80% for business logic
-- **Required:** All public API endpoints, critical paths
-- **Mocking:** Mock external dependencies (API, database)
+- **Required:** All public API endpoints, critical paths, dependency injection
+- **Mocking:** Mock external dependencies (API, database, container components)
 
 ```python
-# ✅ Correct
+# ✅ Correct - Testing with dependency injection
 @pytest.mark.asyncio
-async def test_fetch_user_progress_returns_sorted_by_lesson_order():
+async def test_assessment_engine_evaluates_answers_correctly():
     # Arrange
-    user_id = 12345
-    expected_progress = [
-        UserProgress(lesson_id=1, status=LessonStatus.COMPLETED),
-        UserProgress(lesson_id=2, status=LessonStatus.IN_PROGRESS),
-    ]
-    mock_repo = Mock(spec=ProgressRepository)
-    mock_repo.find_by_user.return_value = expected_progress
+    mock_ai_client = Mock(spec=OpenRouterClient)
+    mock_user_repo = Mock(spec=AsyncUserRepository)
+    
+    engine = AssessmentEngine(
+        ai_client=mock_ai_client,
+        user_repo=mock_user_repo
+    )
     
     # Act
-    result = await fetch_user_progress(user_id, mock_repo)
+    result = await engine.evaluate_answers(["answer1", "answer2"])
     
     # Assert
-    assert result == expected_progress
-    mock_repo.find_by_user.assert_called_once_with(user_id)
+    assert result["score"] == 85
+    mock_ai_client.call_with_fallback.assert_called_once()
+
+# ✅ Correct - Testing container initialization
+@pytest.mark.asyncio
+async def test_dependency_container_initializes_components():
+    container = DependencyContainer.get_instance()
+    await container.initialize()
+    
+    ai_client = container.get_component("ai_client")
+    assert isinstance(ai_client, OpenRouterClient)
+    
+    user_repo = await container.get_user_repository()
+    assert isinstance(user_repo, AsyncUserRepository)
 ```
 
 ---
@@ -519,7 +569,10 @@ AddAssessmentEngine  # PascalCase
 - [ ] Commit messages follow Conventional Commits
 
 ### 11.2 Review Focus Areas
-- **Architecture:** Does it follow layered architecture?
+- **Architecture:** Does it follow layered architecture with dependency injection?
+- **Async Patterns:** Are all I/O operations properly async with container management?
+- **Dependency Injection:** Are components receiving dependencies via constructor injection?
+- **Session Management:** Are async database sessions properly managed by container?
 - **Simplicity:** Could it be simpler?
 - **Error handling:** Are edge cases covered?
 - **Testing:** Are tests meaningful and sufficient?
@@ -548,15 +601,16 @@ AddAssessmentEngine  # PascalCase
 ## 13. Quick Reference
 
 ### 13.1 Naming Summary
-| Element | Convention | Example |
-|---------|-----------|---------|
-| Files/Modules | `snake_case` | `user_repository.py` |
-| Classes | `PascalCase` | `AssessmentEngine` |
-| Functions/Methods | `snake_case` | `calculate_score()` |
-| Variables | `snake_case` | `user_progress` |
-| Constants | `UPPER_SNAKE_CASE` | `MAX_RETRY_ATTEMPTS` |
-| Private | `_snake_case` | `_internal_cache` |
-| Type Aliases | `PascalCase` | `UserId` |
+| Element           | Convention         | Example               |
+| ----------------- | ------------------ | --------------------- |
+| Files/Modules     | `snake_case`       | `user_repository.py`  |
+| Classes           | `PascalCase`       | `AssessmentEngine`    |
+| Repositories      | `AsyncPascalCase`  | `AsyncUserRepository` |
+| Functions/Methods | `snake_case`       | `calculate_score()`   |
+| Variables         | `snake_case`       | `user_progress`       |
+| Constants         | `UPPER_SNAKE_CASE` | `MAX_RETRY_ATTEMPTS`  |
+| Private           | `_snake_case`      | `_internal_cache`     |
+| Type Aliases      | `PascalCase`       | `UserId`              |
 
 ### 13.2 Tools Configuration
 ```toml
@@ -581,10 +635,10 @@ warn_unused_configs = true
 
 - **Principles:** SOLID, KISS, DRY, YAGNI (see `development-rules.md`)
 - **Commits:** Conventional Commits (see `git-commit-rules.md`)
-- **Architecture:** Layered Architecture (see `SAD.md`)
-- **Data Models:** SQLAlchemy patterns (see `DDD.md`)
-- **API Integration:** OpenRouter, Telegram (see `TRD.md`)
+- **Architecture:** Layered Architecture with Dependency Injection (see `SAD.md`)
+- **Data Models:** Async SQLAlchemy patterns (see `DDD.md`)
+- **API Integration:** OpenRouter, Telegram with DI (see `TRD.md`)
 
 ---
 
-**Document Responsibility:** Define coding standards and naming conventions for consistent, maintainable codebase. Does not cover architecture decisions (SAD), technical requirements (TRD), or database design (DDD).
+**Document Responsibility:** Define coding standards and naming conventions for consistent, maintainable codebase with dependency injection patterns. Does not cover architecture decisions (SAD), technical requirements (TRD), or database design (DDD).

@@ -79,9 +79,7 @@ class User(Base):
     # Relationships
     current_lesson = relationship("Lesson", foreign_keys=[current_lesson_id])
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
-    session = relationship(
-        "UserSession", back_populates="user", uselist=False, cascade="all, delete-orphan"
-    )
+    session = relationship("UserSession", back_populates="user", uselist=False)
 
 
 class Lesson(Base):

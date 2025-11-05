@@ -69,22 +69,28 @@ class AssessmentEngine:
         questions = self.get_assessment_questions()
         correct_answers = [q["correct"] for q in questions]
 
+        # Handle case where user didn't answer all questions
+        min_length = min(len(answers), len(correct_answers))
+        answers = answers[:min_length]
+        correct_answers = correct_answers[:min_length]
+
         # Check answers
-        results = [ans == correct for ans, correct in zip(answers, correct_answers, strict=True)]
+        results = [ans == correct for ans, correct in zip(answers, correct_answers)]
 
         # Calculate score
         correct_count = sum(results)
         total = len(questions)
+        answered = len(answers)
         score = int((correct_count / total) * 100) if total > 0 else 0
 
         # Determine skill level - MVP only has beginner lessons, so be conservative
-        # 80%+ = intermediate (but will show beginner lessons)
-        # 60-79% = beginner
+        # 80%+ = advanced (but will show beginner lessons)
+        # 60-79% = intermediate (but will show beginner lessons)
         # <60% = beginner
         if score >= 80:
-            level = SkillLevel.INTERMEDIATE
+            level = SkillLevel.ADVANCED
         elif score >= 60:
-            level = SkillLevel.BEGINNER
+            level = SkillLevel.INTERMEDIATE
         else:
             level = SkillLevel.BEGINNER
 
@@ -92,6 +98,7 @@ class AssessmentEngine:
             "Assessment evaluated",
             score=score,
             correct=correct_count,
+            answered=answered,
             total=total,
             level=level.value,
         )
@@ -101,6 +108,7 @@ class AssessmentEngine:
             "level": level.value,
             "correct": correct_count,
             "total": total,
+            "answered": answered,
         }
 
     async def evaluate_user_prompt(
@@ -152,7 +160,7 @@ Respond in this exact JSON format:
             import re
 
             # Try to find JSON in response
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
                 score = int(result.get("score", 5))
@@ -172,7 +180,9 @@ Respond in this exact JSON format:
                 }
             else:
                 # Fallback if JSON parsing fails
-                logger.warning("Failed to parse AI response as JSON, using fallback", lesson_id=lesson_id)
+                logger.warning(
+                    "Failed to parse AI response as JSON, using fallback", lesson_id=lesson_id
+                )
                 return {
                     "score": 5,
                     "strengths": ["Good attempt at creating a prompt"],
@@ -184,7 +194,9 @@ Respond in this exact JSON format:
 
         except Exception as e:
             # Fallback on any error
-            logger.error("Error evaluating prompt, using fallback", lesson_id=lesson_id, error=str(e))
+            logger.error(
+                "Error evaluating prompt, using fallback", lesson_id=lesson_id, error=str(e)
+            )
             return {
                 "score": 5,
                 "strengths": ["You submitted a prompt"],

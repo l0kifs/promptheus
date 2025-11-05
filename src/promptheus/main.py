@@ -13,6 +13,7 @@ from telegram.ext import (
 )
 
 from promptheus.config import get_settings
+from promptheus.config.settings import Settings
 from promptheus.core.dependency_container import DependencyContainer
 from promptheus.data.database import Base, engine
 
@@ -82,6 +83,55 @@ def init_database() -> None:
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.critical("Failed to initialize database", error=str(e))
+        raise
+
+
+async def start_bot_polling(application: Application, settings: Settings) -> None:
+    """Start bot in polling mode (for development)."""
+    logger.info("Starting bot in polling mode")
+
+    # Remove any existing webhook to ensure clean state
+    try:
+        await application.bot.delete_webhook()
+        logger.debug("Removed existing webhook (if any)")
+    except Exception as e:
+        logger.debug("No existing webhook to remove or removal failed", error=str(e))
+
+    # Start polling
+    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("Bot is running in polling mode. Press Ctrl+C to stop.")
+
+
+async def start_bot_webhook(application: Application, settings: Settings) -> None:
+    """Start bot in webhook mode (for production)."""
+    logger.info("Starting bot in webhook mode", webhook_url=settings.webhook_url)
+
+    if not settings.webhook_url:
+        raise ValueError("webhook_url is required for webhook mode")
+
+    # Register webhook with Telegram
+    try:
+        await application.bot.set_webhook(
+            url=settings.webhook_url,
+            secret_token=settings.webhook_secret,
+        )
+        logger.info("Webhook registered successfully with Telegram")
+    except Exception as e:
+        logger.error("Failed to register webhook with Telegram", error=str(e))
+        raise
+
+    # Start webhook server
+    try:
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=settings.webhook_port,
+            url_path=settings.webhook_path,
+            webhook_url=settings.webhook_url,
+            secret_token=settings.webhook_secret,
+        )
+        logger.info("Webhook server started", port=settings.webhook_port, path=settings.webhook_path)
+    except Exception as e:
+        logger.error("Failed to start webhook server", error=str(e))
         raise
 
 
@@ -180,8 +230,13 @@ async def main() -> None:
     try:
         await application.initialize()
         await application.start()
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)  # type: ignore
-        logger.info("Bot is running. Press Ctrl+C to stop.")
+
+        # Choose bot mode based on settings
+        if settings.bot_mode == "webhook":
+            await start_bot_webhook(application, settings)
+        else:
+            await start_bot_polling(application, settings)
+
     except Exception as e:
         logger.critical("Failed to start bot", error=str(e))
         return
@@ -199,8 +254,13 @@ async def main() -> None:
             with contextlib.suppress(asyncio.CancelledError):
                 await cleanup_task
 
-            # Stop telegram bot
-            await application.updater.stop()  # type: ignore
+            # Stop telegram bot (safe for both polling and webhook modes)
+            try:
+                if hasattr(application, 'updater') and application.updater:
+                    await application.updater.stop()  # type: ignore
+            except Exception:
+                pass  # updater may not exist in webhook mode
+
             await application.stop()
             await application.shutdown()
 

@@ -212,8 +212,89 @@ All configuration is done via environment variables in `.env`:
 | `DATABASE_URL` | Database connection URL | `sqlite:///./data/promptheus.db` |
 | `ENVIRONMENT` | Environment (development/production) | `development` |
 | `LOG_LEVEL` | Logging level | `INFO` |
+| `BOT_MODE` | Bot operating mode (polling/webhook) | `polling` |
+| `WEBHOOK_URL` | Webhook URL (required for webhook mode) | None |
+| `WEBHOOK_SECRET` | Webhook secret token | None |
+| `WEBHOOK_PORT` | Webhook server port | 8443 |
+| `WEBHOOK_PATH` | Webhook endpoint path | `/webhook` |
 
 See `.env.example` for all available options.
+
+### Bot Modes
+
+Promptheus supports two operating modes:
+
+#### Polling Mode (Development)
+- **Use case**: Local development, testing, CI/CD
+- **How it works**: Bot actively polls Telegram API for updates
+- **Configuration**: `BOT_MODE=polling` (default)
+- **Pros**: Easy setup, works behind firewalls/NAT
+- **Cons**: Higher latency, consumes more API calls
+
+#### Webhook Mode (Production)
+- **Use case**: Production deployment, scalable environments
+- **How it works**: Telegram sends updates directly to your server
+- **Configuration**: `BOT_MODE=webhook` with `WEBHOOK_URL=https://yourdomain.com/webhook`
+- **Requirements**:
+  - Public HTTPS URL (Let's Encrypt recommended)
+  - Port must be 80, 88, 443, or 8443
+  - SSL certificate required
+- **Pros**: Lower latency, more efficient, real-time updates
+- **Cons**: Requires public server with SSL
+
+#### Setting up Webhook Mode
+
+1. **Get a domain with SSL**:
+   ```bash
+   # Using Let's Encrypt with certbot
+   sudo certbot certonly --standalone -d yourdomain.com
+   ```
+
+2. **Configure reverse proxy** (nginx example):
+   ```nginx
+   server {
+       listen 443 ssl http2;
+       server_name yourdomain.com;
+       
+       ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+       ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+       
+       location /webhook {
+           proxy_pass http://127.0.0.1:8443/webhook;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+
+3. **Update `.env`**:
+   ```bash
+   BOT_MODE=webhook
+   WEBHOOK_URL=https://yourdomain.com/webhook
+   WEBHOOK_SECRET=your_secure_random_secret_here
+   WEBHOOK_PORT=8443
+   ```
+
+4. **For local testing with ngrok**:
+   ```bash
+   # Install ngrok
+   npm install -g ngrok
+   
+   # Start tunnel
+   ngrok http 8443
+   
+   # Use the HTTPS URL in .env
+   WEBHOOK_URL=https://abc123.ngrok.io/webhook
+   ```
+
+#### Mode Selection Guidelines
+
+- **Development**: Always use `polling`
+- **Staging/Testing**: Use `polling` or `webhook` with ngrok
+- **Production**: Always use `webhook` with proper SSL
+- **CI/CD**: Use `polling` for automated tests
 
 ## Architecture
 

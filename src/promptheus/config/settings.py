@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -64,6 +64,52 @@ class Settings(BaseSettings):
         default=15,
         description="Session timeout in minutes",
     )
+
+    # Bot Mode Configuration
+    bot_mode: Literal["polling", "webhook"] = Field(
+        default="polling",
+        description="Bot operating mode: polling for development, webhook for production",
+    )
+    webhook_url: str | None = Field(
+        default=None,
+        description="Webhook URL for webhook mode (must be HTTPS)",
+    )
+    webhook_secret: str | None = Field(
+        default=None,
+        description="Webhook secret for request validation (recommended for security)",
+    )
+    webhook_port: int = Field(
+        default=8443,
+        description="Port for webhook HTTP server (must be 80, 88, 443, or 8443)",
+    )
+    webhook_path: str = Field(
+        default="/webhook",
+        description="Path for webhook endpoint",
+    )
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_webhook_url(cls, v: str | None) -> str | None:
+        """Validate that webhook URL uses HTTPS protocol."""
+        if v is not None and not v.startswith("https://"):
+            raise ValueError("webhook_url must use HTTPS protocol")
+        return v
+
+    @field_validator("webhook_port")
+    @classmethod
+    def validate_webhook_port(cls, v: int) -> int:
+        """Validate that webhook port is one of the allowed values."""
+        allowed_ports = [80, 88, 443, 8443]
+        if v not in allowed_ports:
+            raise ValueError(f"webhook_port must be one of {allowed_ports}")
+        return v
+
+    @model_validator(mode="after")
+    def validate_webhook_mode_requirements(self) -> "Settings":
+        """Validate that webhook mode has required configuration."""
+        if self.bot_mode == "webhook" and not self.webhook_url:
+            raise ValueError("webhook_url is required when bot_mode is 'webhook'")
+        return self
 
 
 @lru_cache

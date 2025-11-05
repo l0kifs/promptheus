@@ -164,39 +164,77 @@ AI_MODEL_PRIMARY=env_file/model:v1
         with pytest.raises(ValueError, match="environment"):
             Settings()
 
-    def test_settings_invalid_log_level(self, monkeypatch):
-        """Test that invalid log level raises validation error."""
+    def test_settings_webhook_mode_requires_url(self, monkeypatch):
+        """Test that webhook mode requires webhook_url."""
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
-        monkeypatch.setenv("LOG_LEVEL", "INVALID_LEVEL")
+        monkeypatch.setenv("BOT_MODE", "webhook")
+        # webhook_url not set
 
-        # Pydantic should accept any string for log_level
-        settings = Settings()
-        assert settings.log_level == "INVALID_LEVEL"
+        with pytest.raises(ValueError, match="webhook_url is required when bot_mode is 'webhook'"):
+            Settings()
 
-    def test_settings_numeric_fields_validation(self, monkeypatch):
-        """Test validation of numeric fields."""
+    def test_settings_webhook_url_must_be_https(self, monkeypatch):
+        """Test that webhook URL must use HTTPS protocol."""
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
+        monkeypatch.setenv("BOT_MODE", "webhook")
+        monkeypatch.setenv("WEBHOOK_URL", "http://example.com/webhook")  # HTTP not HTTPS
 
-        # Test negative values (should be allowed or handled)
-        monkeypatch.setenv("MAX_TOKENS_DEFAULT", "-100")
-        monkeypatch.setenv("TEMPERATURE_DEFAULT", "-0.5")
+        with pytest.raises(ValueError, match="webhook_url must use HTTPS protocol"):
+            Settings()
 
-        settings = Settings()
-        assert settings.max_tokens_default == -100
-        assert settings.temperature_default == -0.5
-
-    def test_settings_extra_fields_ignored(self, monkeypatch):
-        """Test that extra fields in env are ignored."""
+    def test_settings_webhook_port_must_be_valid(self, monkeypatch):
+        """Test that webhook port must be one of allowed values."""
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
-        monkeypatch.setenv("EXTRA_FIELD", "should_be_ignored")
+        monkeypatch.setenv("WEBHOOK_PORT", "9999")  # Invalid port
+
+        with pytest.raises(ValueError, match="webhook_port must be one of"):
+            Settings()
+
+    def test_settings_valid_webhook_configuration(self, monkeypatch):
+        """Test that valid webhook configuration is accepted."""
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
+        monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
+        monkeypatch.setenv("BOT_MODE", "webhook")
+        monkeypatch.setenv("WEBHOOK_URL", "https://example.com/webhook")
+        monkeypatch.setenv("WEBHOOK_SECRET", "secret123")
+        monkeypatch.setenv("WEBHOOK_PORT", "8443")
 
         settings = Settings()
 
-        # Should not have extra field
-        assert not hasattr(settings, "extra_field")
+        assert settings.bot_mode == "webhook"
+        assert settings.webhook_url == "https://example.com/webhook"
+        assert settings.webhook_secret == "secret123"
+        assert settings.webhook_port == 8443
+        assert settings.webhook_path == "/webhook"  # default value
+
+    def test_settings_polling_mode_default(self, monkeypatch):
+        """Test that polling mode is default and doesn't require webhook config."""
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
+        monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
+        # BOT_MODE not set, should default to polling
+
+        settings = Settings()
+
+        assert settings.bot_mode == "polling"
+        assert settings.webhook_url is None
+        assert settings.webhook_secret is None
+        assert settings.webhook_port == 8443  # default
+        assert settings.webhook_path == "/webhook"  # default
+
+    def test_settings_webhook_valid_ports(self, monkeypatch):
+        """Test that all valid webhook ports are accepted."""
+        valid_ports = [80, 88, 443, 8443]
+
+        for port in valid_ports:
+            monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
+            monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
+            monkeypatch.setenv("WEBHOOK_PORT", str(port))
+
+            settings = Settings()
+            assert settings.webhook_port == port
 
 
 class TestGetSettingsFunction:

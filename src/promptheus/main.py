@@ -1,6 +1,5 @@
-"""Main application entry point."""
-
 import asyncio
+import contextlib
 import sys
 
 from loguru import logger
@@ -13,10 +12,38 @@ from telegram.ext import (
     filters,
 )
 
-from promptheus.ai.openrouter_client import OpenRouterClient
-from promptheus.bot.handlers import BotHandlers
 from promptheus.config import get_settings
+from promptheus.core.dependency_container import DependencyContainer
 from promptheus.data.database import Base, engine
+
+
+async def session_cleanup_worker(container: DependencyContainer) -> None:
+    """Background worker for periodic session cleanup."""
+    logger.info("Session cleanup worker started")
+    while True:
+        try:
+            # Wait 24 hours between cleanups
+            await asyncio.sleep(24 * 60 * 60)  # 24 hours in seconds
+
+            logger.info("Running scheduled session cleanup")
+            # Use proper session management
+            async with container._async_session_maker() as session:
+                from promptheus.data.async_repositories import AsyncSessionRepository
+
+                session_repo = AsyncSessionRepository(session)
+                deleted_count = await session_repo.cleanup_old_sessions(days_old=30)
+
+                if deleted_count > 0:
+                    logger.info("Background cleanup completed", deleted_sessions=deleted_count)
+                else:
+                    logger.debug("Background cleanup completed: no old sessions found")
+
+        except asyncio.CancelledError:
+            logger.info("Session cleanup worker cancelled")
+            break
+        except Exception as e:
+            logger.error("Error in session cleanup worker", error=str(e))
+            # Continue running despite errors
 
 
 def configure_logging() -> None:
@@ -75,10 +102,11 @@ async def main() -> None:
         return
 
     # Initialize components
-    logger.info("Initializing AI client and bot handlers")
+    logger.info("Initializing dependency container and components")
     try:
-        ai_client = OpenRouterClient()
-        handlers = BotHandlers(ai_client)
+        container = DependencyContainer.get_instance()
+        await container.initialize()
+        handlers = await container.get_bot_handlers()
         logger.info("Components initialized successfully")
     except Exception as e:
         logger.critical("Failed to initialize components", error=str(e))
@@ -100,21 +128,13 @@ async def main() -> None:
 
     # Callback handlers
     application.add_handler(
-        CallbackQueryHandler(
-            handlers.start_learning_callback, pattern="^start_learning$"
-        )
+        CallbackQueryHandler(handlers.start_learning_callback, pattern="^start_learning$")
     )
     application.add_handler(
-        CallbackQueryHandler(
-            handlers.start_assessment_callback, pattern="^start_assessment$"
-        )
+        CallbackQueryHandler(handlers.start_assessment_callback, pattern="^start_assessment$")
     )
-    application.add_handler(
-        CallbackQueryHandler(handlers.answer_callback, pattern="^answer_")
-    )
-    application.add_handler(
-        CallbackQueryHandler(handlers.goal_callback, pattern="^goal_")
-    )
+    application.add_handler(CallbackQueryHandler(handlers.answer_callback, pattern="^answer_"))
+    application.add_handler(CallbackQueryHandler(handlers.goal_callback, pattern="^goal_"))
     application.add_handler(
         CallbackQueryHandler(handlers.lesson_callback, pattern="^lesson_[0-9]+$")
     )
@@ -127,30 +147,16 @@ async def main() -> None:
     application.add_handler(
         CallbackQueryHandler(handlers.theory_prev_callback, pattern="^theory_prev_")
     )
-    application.add_handler(
-        CallbackQueryHandler(handlers.examples_callback, pattern="^examples_")
-    )
-    application.add_handler(
-        CallbackQueryHandler(handlers.practice_callback, pattern="^practice_")
-    )
+    application.add_handler(CallbackQueryHandler(handlers.examples_callback, pattern="^examples_"))
+    application.add_handler(CallbackQueryHandler(handlers.practice_callback, pattern="^practice_"))
     application.add_handler(
         CallbackQueryHandler(handlers.lesson_list_callback, pattern="^lesson_list$")
     )
-    application.add_handler(
-        CallbackQueryHandler(handlers.menu_callback, pattern="^menu$")
-    )
-    application.add_handler(
-        CallbackQueryHandler(handlers.continue_callback, pattern="^continue$")
-    )
-    application.add_handler(
-        CallbackQueryHandler(handlers.progress_callback, pattern="^progress$")
-    )
-    application.add_handler(
-        CallbackQueryHandler(handlers.hint_callback, pattern="^hint_")
-    )
-    application.add_handler(
-        CallbackQueryHandler(handlers.skip_callback, pattern="^skip_")
-    )
+    application.add_handler(CallbackQueryHandler(handlers.menu_callback, pattern="^menu$"))
+    application.add_handler(CallbackQueryHandler(handlers.continue_callback, pattern="^continue$"))
+    application.add_handler(CallbackQueryHandler(handlers.progress_callback, pattern="^progress$"))
+    application.add_handler(CallbackQueryHandler(handlers.hint_callback, pattern="^hint_"))
+    application.add_handler(CallbackQueryHandler(handlers.skip_callback, pattern="^skip_"))
     application.add_handler(
         CallbackQueryHandler(handlers.lesson_complete_callback, pattern="^lesson_complete_")
     )
@@ -163,6 +169,11 @@ async def main() -> None:
     # Error handler
     application.add_error_handler(handlers.error_handler)
     logger.info("All handlers registered successfully")
+
+    # Start background cleanup task
+    logger.info("Starting background session cleanup task")
+    cleanup_task = asyncio.create_task(session_cleanup_worker(container))
+    logger.info("Background cleanup task started")
 
     # Start bot
     logger.info("Starting bot...")
@@ -178,12 +189,24 @@ async def main() -> None:
     # Keep running
     try:
         await asyncio.Event().wait()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
+    finally:
         logger.info("Received shutdown signal, stopping bot...")
         try:
+            # Cancel background tasks
+            cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await cleanup_task
+
+            # Stop telegram bot
             await application.updater.stop()  # type: ignore
             await application.stop()
             await application.shutdown()
+
+            # Cleanup database connections
+            await container.cleanup()
+
             logger.info("Bot stopped gracefully")
         except Exception as e:
             logger.error("Error during shutdown", error=str(e))

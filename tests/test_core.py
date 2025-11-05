@@ -1,7 +1,6 @@
 """Tests for core business logic."""
 
 import pytest
-from sqlalchemy.orm import Session
 
 from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.core.assessment_engine import AssessmentEngine
@@ -11,8 +10,6 @@ from promptheus.data.models import (
     LessonStatus,
     SessionState,
     SkillLevel,
-    User,
-    UserProgress,
 )
 
 
@@ -76,86 +73,81 @@ class TestProgressTracker:
     """Tests for ProgressTracker."""
 
     @pytest.fixture
-    def tracker(self, db_session: Session):
-        """Create progress tracker."""
-        return ProgressTracker(db_session)
+    def tracker(self, mocker):
+        """Create progress tracker with mocked repo."""
+        mock_repo = mocker.AsyncMock()
+        return ProgressTracker(mock_repo)
 
-    def test_start_lesson(self, tracker, db_session: Session, sample_user: User, sample_lesson):
+    @pytest.mark.asyncio
+    async def test_start_lesson(self, tracker):
         """Test starting a lesson."""
-        tracker.start_lesson(sample_user.telegram_id, sample_lesson.id)
+        user_id = 123
+        lesson_id = 456
 
-        progress = (
-            db_session.query(UserProgress)
-            .filter(
-                UserProgress.user_id == sample_user.telegram_id,
-                UserProgress.lesson_id == sample_lesson.id,
-            )
-            .first()
-        )
+        # Mock the repo to return None (no existing progress)
+        tracker.progress_repo.find_by_user_and_lesson.return_value = None
+        tracker.progress_repo.create.return_value = None
 
-        assert progress is not None
-        assert progress.status == LessonStatus.IN_PROGRESS
-        assert progress.attempts == 0
+        await tracker.start_lesson(user_id, lesson_id)
 
-    def test_mark_completed(
-        self, tracker, db_session: Session, sample_user: User, sample_lesson
-    ):
+        # Verify the repo methods were called correctly
+        tracker.progress_repo.find_by_user_and_lesson.assert_called_once_with(user_id, lesson_id)
+        tracker.progress_repo.create.assert_called_once_with(user_id, lesson_id)
+
+    @pytest.mark.asyncio
+    async def test_mark_completed(self, tracker):
         """Test marking lesson as completed."""
-        # Start lesson first
-        tracker.start_lesson(sample_user.telegram_id, sample_lesson.id)
+        user_id = 123
+        lesson_id = 456
+        score = 85
 
-        # Mark completed
-        tracker.mark_completed(sample_user.telegram_id, sample_lesson.id, 85)
+        # Create a mock progress object
+        mock_progress = type(
+            "MockProgress", (), {"status": None, "last_score": None, "completed_at": None}
+        )()
 
-        progress = (
-            db_session.query(UserProgress)
-            .filter(
-                UserProgress.user_id == sample_user.telegram_id,
-                UserProgress.lesson_id == sample_lesson.id,
-            )
-            .first()
-        )
+        tracker.progress_repo.find_by_user_and_lesson.return_value = mock_progress
 
-        assert progress.status == LessonStatus.COMPLETED
-        assert progress.last_score == 85
-        assert progress.completed_at is not None
+        await tracker.mark_completed(user_id, lesson_id, score)
 
-    def test_record_attempt(
-        self, tracker, db_session: Session, sample_user: User, sample_lesson
-    ):
+        # Verify the progress was updated
+        assert mock_progress.status == LessonStatus.COMPLETED
+        assert mock_progress.last_score == score
+        assert mock_progress.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_record_attempt(self, tracker):
         """Test recording exercise attempt."""
-        # Start lesson first
-        tracker.start_lesson(sample_user.telegram_id, sample_lesson.id)
+        user_id = 123
+        lesson_id = 456
+        score = 75
 
-        # Record attempt
-        tracker.record_attempt(sample_user.telegram_id, sample_lesson.id, 75)
+        # Create a mock progress object
+        mock_progress = type("MockProgress", (), {"attempts": 0, "last_score": None})()
 
-        progress = (
-            db_session.query(UserProgress)
-            .filter(
-                UserProgress.user_id == sample_user.telegram_id,
-                UserProgress.lesson_id == sample_lesson.id,
-            )
-            .first()
-        )
+        tracker.progress_repo.find_by_user_and_lesson.return_value = mock_progress
 
-        assert progress.attempts == 1
-        assert progress.last_score == 75
+        await tracker.record_attempt(user_id, lesson_id, score)
 
-    def test_get_progress_summary(
-        self, tracker, db_session: Session, sample_user: User, multiple_lessons
-    ):
+        # Verify the repo methods were called
+        tracker.progress_repo.increment_attempts.assert_called_once_with(user_id, lesson_id)
+        tracker.progress_repo.update_score.assert_called_once_with(user_id, lesson_id, score)
+
+    @pytest.mark.asyncio
+    async def test_get_progress_summary(self, tracker):
         """Test getting progress summary."""
-        # Start and complete some lessons
-        tracker.start_lesson(sample_user.telegram_id, multiple_lessons[0].id)
-        tracker.mark_completed(sample_user.telegram_id, multiple_lessons[0].id, 80)
+        user_id = 123
 
-        tracker.start_lesson(sample_user.telegram_id, multiple_lessons[1].id)
-        tracker.mark_completed(sample_user.telegram_id, multiple_lessons[1].id, 90)
+        # Create mock progress records
+        mock_progresses = [
+            type("MockProgress", (), {"status": LessonStatus.COMPLETED, "last_score": 80})(),
+            type("MockProgress", (), {"status": LessonStatus.COMPLETED, "last_score": 90})(),
+            type("MockProgress", (), {"status": LessonStatus.IN_PROGRESS, "last_score": None})(),
+        ]
 
-        tracker.start_lesson(sample_user.telegram_id, multiple_lessons[2].id)
+        tracker.progress_repo.find_by_user.return_value = mock_progresses
 
-        summary = tracker.get_progress_summary(sample_user.telegram_id)
+        summary = await tracker.get_progress_summary(user_id)
 
         assert summary["completed"] == 2
         assert summary["total"] == 3
@@ -166,59 +158,89 @@ class TestLearningFlowOrchestrator:
     """Tests for LearningFlowOrchestrator."""
 
     @pytest.fixture
-    def orchestrator(self, db_session: Session):
-        """Create orchestrator."""
-        return LearningFlowOrchestrator(db_session)
+    async def orchestrator(self, mocker):
+        """Create orchestrator with mocked repos."""
+        mock_user_repo = mocker.AsyncMock()
+        mock_lesson_repo = mocker.AsyncMock()
+        mock_session_repo = mocker.AsyncMock()
+        return LearningFlowOrchestrator(mock_user_repo, mock_lesson_repo, mock_session_repo)
 
-    def test_get_personalized_path(
-        self, orchestrator, db_session: Session, sample_user: User, multiple_lessons
-    ):
+    @pytest.mark.asyncio
+    async def test_get_personalized_path(self, orchestrator):
         """Test getting personalized lesson path."""
-        path = orchestrator.get_personalized_path(
-            sample_user.telegram_id, SkillLevel.BEGINNER
-        )
+        user_id = 123
+
+        # Mock user and lessons
+        mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
+        mock_lessons = [
+            type("MockLesson", (), {"id": 1, "title": "Lesson 1", "order_index": 1})(),
+            type("MockLesson", (), {"id": 2, "title": "Lesson 2", "order_index": 2})(),
+            type("MockLesson", (), {"id": 3, "title": "Lesson 3", "order_index": 3})(),
+        ]
+
+        orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
+        orchestrator.lesson_repo.find_by_skill_level.return_value = mock_lessons
+
+        path = await orchestrator.get_personalized_path(user_id, SkillLevel.BEGINNER)
 
         assert len(path) == 3
         assert path[0]["title"] == "Lesson 1"
         assert path[1]["title"] == "Lesson 2"
         assert path[2]["title"] == "Lesson 3"
 
-    def test_get_next_lesson(
-        self, orchestrator, db_session: Session, sample_user: User, multiple_lessons
-    ):
+    @pytest.mark.asyncio
+    async def test_get_next_lesson(self, orchestrator):
         """Test getting next lesson in sequence."""
-        next_lesson = orchestrator.get_next_lesson(
-            sample_user.telegram_id, multiple_lessons[0].id
-        )
+        user_id = 123
+        current_lesson_id = 1
+
+        # Mock user and lessons
+        mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
+        mock_current_lesson = type("MockLesson", (), {"order_index": 1})()
+        mock_next_lesson = type(
+            "MockLesson", (), {"id": 2, "title": "Lesson 2", "order_index": 2}
+        )()
+
+        orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
+        orchestrator.lesson_repo.find_by_id.return_value = mock_current_lesson
+        orchestrator.lesson_repo.find_next_lesson.return_value = mock_next_lesson
+
+        next_lesson = await orchestrator.get_next_lesson(user_id, current_lesson_id)
 
         assert next_lesson is not None
         assert next_lesson["title"] == "Lesson 2"
         assert next_lesson["order"] == 2
 
-    def test_get_next_lesson_last_lesson(
-        self, orchestrator, db_session: Session, sample_user: User, multiple_lessons
-    ):
+    @pytest.mark.asyncio
+    async def test_get_next_lesson_last_lesson(self, orchestrator):
         """Test getting next lesson when on last lesson."""
-        next_lesson = orchestrator.get_next_lesson(
-            sample_user.telegram_id, multiple_lessons[2].id
-        )
+        user_id = 123
+        current_lesson_id = 3
+
+        # Mock user and lessons
+        mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
+        mock_current_lesson = type("MockLesson", (), {"order_index": 3})()
+
+        orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
+        orchestrator.lesson_repo.find_by_id.return_value = mock_current_lesson
+        orchestrator.lesson_repo.find_next_lesson.return_value = None
+
+        next_lesson = await orchestrator.get_next_lesson(user_id, current_lesson_id)
 
         assert next_lesson is None
 
-    def test_update_session_state(
-        self, orchestrator, db_session: Session, sample_user: User
-    ):
+    @pytest.mark.asyncio
+    async def test_update_session_state(self, orchestrator):
         """Test updating session state."""
+        user_id = 123
         context = {"current_step": "assessment", "question": 1}
 
-        orchestrator.update_session_state(
-            sample_user.telegram_id, SessionState.ONBOARDING, context
+        await orchestrator.update_session_state(user_id, SessionState.ONBOARDING, context)
+
+        # Verify the session repo was called
+        orchestrator.session_repo.create_or_update.assert_called_once_with(
+            user_id, SessionState.ONBOARDING, context
         )
-
-        session = orchestrator.get_session_context(sample_user.telegram_id)
-
-        assert session["current_step"] == "assessment"
-        assert session["question"] == 1
 
 
 class TestMessageFormatter:

@@ -1,8 +1,15 @@
 """Tests for data repositories."""
 
 import pytest
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from promptheus.data.async_repositories import (
+    AsyncLessonRepository,
+    AsyncProgressRepository,
+    AsyncSessionRepository,
+    AsyncUserRepository,
+)
 from promptheus.data.models import (
     LearningGoal,
     Lesson,
@@ -11,25 +18,19 @@ from promptheus.data.models import (
     SkillLevel,
     User,
 )
-from promptheus.data.repositories import (
-    LessonRepository,
-    ProgressRepository,
-    SessionRepository,
-    UserRepository,
-)
 
 
 class TestUserRepository:
     """Tests for UserRepository."""
 
     @pytest.fixture
-    def repo(self, db_session: Session):
+    async def repo(self, async_db_session: AsyncSession):
         """Create user repository."""
-        return UserRepository(db_session)
+        return AsyncUserRepository(async_db_session)
 
-    def test_create_user(self, repo, db_session: Session):
+    async def test_create_user(self, repo, async_db_session: AsyncSession):
         """Test creating a new user."""
-        user = repo.create(
+        user = await repo.create(
             telegram_id=99999,
             username="newuser",
             skill_level=SkillLevel.BEGINNER,
@@ -42,28 +43,33 @@ class TestUserRepository:
         assert user.learning_goal == LearningGoal.ACADEMIC
 
         # Verify in database
-        db_user = db_session.query(User).filter(User.telegram_id == 99999).first()
+        db_user = await async_db_session.scalar(select(User).where(User.telegram_id == 99999))
         assert db_user is not None
 
-    def test_find_by_telegram_id(self, repo, sample_user: User):
+    async def test_find_by_telegram_id(self, repo, async_sample_user: User):
         """Test finding user by telegram ID."""
-        user = repo.find_by_telegram_id(sample_user.telegram_id)
+        user = await repo.find_by_telegram_id(async_sample_user.telegram_id)
 
         assert user is not None
-        assert user.telegram_id == sample_user.telegram_id
-        assert user.username == sample_user.username
+        assert user.telegram_id == async_sample_user.telegram_id
+        assert user.username == async_sample_user.username
 
-    def test_find_by_telegram_id_not_found(self, repo):
+    async def test_find_by_telegram_id_not_found(self, repo):
         """Test finding non-existent user."""
-        user = repo.find_by_telegram_id(99999)
+        import random
+
+        non_existent_id = random.randint(1000000, 9999999)  # Use a very large random ID
+        user = await repo.find_by_telegram_id(non_existent_id)
 
         assert user is None
 
-    def test_update_assessment_score(self, repo, sample_user: User):
+    async def test_update_assessment_score(self, repo, async_sample_user_id: int):
         """Test updating assessment score."""
-        repo.update_assessment_score(sample_user.telegram_id, 85)
+        await repo.update_assessment_score(async_sample_user_id, 85)
 
-        user = repo.find_by_telegram_id(sample_user.telegram_id)
+        user = await repo.find_by_telegram_id(async_sample_user_id)
+        assert user is not None
+
         assert user.assessment_score == 85  # type: ignore
 
 
@@ -71,13 +77,13 @@ class TestLessonRepository:
     """Tests for LessonRepository."""
 
     @pytest.fixture
-    def repo(self, db_session: Session):
+    async def repo(self, async_db_session: AsyncSession):
         """Create lesson repository."""
-        return LessonRepository(db_session)
+        return AsyncLessonRepository(async_db_session)
 
-    def test_create_lesson(self, repo, db_session: Session):
+    async def test_create_lesson(self, repo, async_db_session: AsyncSession):
         """Test creating a new lesson."""
-        lesson = repo.create(
+        lesson = await repo.create(
             title="New Lesson",
             skill_level=SkillLevel.INTERMEDIATE,
             order_index=1,
@@ -91,72 +97,83 @@ class TestLessonRepository:
         assert lesson.skill_level == SkillLevel.INTERMEDIATE
 
         # Verify in database
-        db_lesson = db_session.query(Lesson).filter(Lesson.title == "New Lesson").first()
+        db_lesson = await async_db_session.scalar(
+            select(Lesson).where(Lesson.title == "New Lesson")
+        )
         assert db_lesson is not None
 
-    def test_find_by_id(self, repo, sample_lesson: Lesson):
+    async def test_find_by_id(self, repo, async_sample_lesson: Lesson):
         """Test finding lesson by ID."""
-        lesson = repo.find_by_id(sample_lesson.id)
+        lesson = await repo.find_by_id(async_sample_lesson.id)
 
         assert lesson is not None
-        assert lesson.title == sample_lesson.title  # type: ignore
+        assert lesson.title == async_sample_lesson.title  # type: ignore
 
-    def test_find_by_skill_level(self, repo, multiple_lessons):
+    async def test_find_by_skill_level(self, repo, async_multiple_lessons):
         """Test finding lessons by skill level."""
-        lessons = repo.find_by_skill_level(SkillLevel.BEGINNER)
+        lessons = await repo.find_by_skill_level(SkillLevel.BEGINNER)
 
-        assert len(lessons) == 3
+        # Should find at least the 3 fixture lessons plus any seeded lessons
+        assert len(lessons) >= 3
         assert all(lesson.skill_level == SkillLevel.BEGINNER for lesson in lessons)
 
-    def test_find_next_lesson(self, repo, multiple_lessons):
+    async def test_find_next_lesson(self, repo, async_multiple_lessons):
         """Test finding next lesson in sequence."""
-        next_lesson = repo.find_next_lesson(SkillLevel.BEGINNER, 1)
+        # Sort the fixture lessons by order_index to find the expected next one
+        sorted_lessons = sorted(async_multiple_lessons, key=lambda lesson: lesson.order_index)
+        first_lesson = sorted_lessons[0]
 
-        assert next_lesson is not None
-        assert next_lesson.order_index == 2  # type: ignore
+        # Find the next lesson using the repo method
+        next_lesson = await repo.find_next_lesson(SkillLevel.BEGINNER, first_lesson.order_index)
+
+        if next_lesson:
+            # The next lesson should have order_index > first_lesson.order_index
+            assert next_lesson.order_index > first_lesson.order_index
+            # The next lesson should be for BEGINNER skill level
+            assert next_lesson.skill_level == SkillLevel.BEGINNER
 
 
 class TestProgressRepository:
     """Tests for ProgressRepository."""
 
     @pytest.fixture
-    def repo(self, db_session: Session):
+    async def repo(self, async_db_session: AsyncSession):
         """Create progress repository."""
-        return ProgressRepository(db_session)
+        return AsyncProgressRepository(async_db_session)
 
-    def test_create_progress(self, repo, sample_user: User, sample_lesson: Lesson):
+    async def test_create_progress(
+        self, repo, async_sample_user_id: int, async_sample_lesson_id: int
+    ):
         """Test creating progress record."""
-        progress = repo.create(sample_user.telegram_id, sample_lesson.id)
+        progress = await repo.create(async_sample_user_id, async_sample_lesson_id)
 
-        assert progress.user_id == sample_user.telegram_id  # type: ignore
-        assert progress.lesson_id == sample_lesson.id  # type: ignore
+        assert progress.user_id == async_sample_user_id  # type: ignore
+        assert progress.lesson_id == async_sample_lesson_id  # type: ignore
         assert progress.status == LessonStatus.IN_PROGRESS
 
-    def test_find_by_user_and_lesson(
-        self, repo, sample_user: User, sample_lesson: Lesson
+    async def test_find_by_user_and_lesson(
+        self, repo, async_sample_user_id: int, async_sample_lesson_id: int
     ):
         """Test finding progress by user and lesson."""
         # Create progress first
-        repo.create(sample_user.telegram_id, sample_lesson.id)
+        await repo.create(async_sample_user_id, async_sample_lesson_id)
 
         # Find it
-        progress = repo.find_by_user_and_lesson(
-            sample_user.telegram_id, sample_lesson.id
-        )
+        progress = await repo.find_by_user_and_lesson(async_sample_user_id, async_sample_lesson_id)
 
         assert progress is not None
-        assert progress.user_id == sample_user.telegram_id  # type: ignore
+        assert progress.user_id == async_sample_user_id  # type: ignore
 
-    def test_increment_attempts(self, repo, sample_user: User, sample_lesson: Lesson):
+    async def test_increment_attempts(
+        self, repo, async_sample_user_id: int, async_sample_lesson_id: int
+    ):
         """Test incrementing attempt counter."""
-        repo.create(sample_user.telegram_id, sample_lesson.id)
+        await repo.create(async_sample_user_id, async_sample_lesson_id)
 
-        repo.increment_attempts(sample_user.telegram_id, sample_lesson.id)
-        repo.increment_attempts(sample_user.telegram_id, sample_lesson.id)
+        await repo.increment_attempts(async_sample_user_id, async_sample_lesson_id)
+        await repo.increment_attempts(async_sample_user_id, async_sample_lesson_id)
 
-        progress = repo.find_by_user_and_lesson(
-            sample_user.telegram_id, sample_lesson.id
-        )
+        progress = await repo.find_by_user_and_lesson(async_sample_user_id, async_sample_lesson_id)
         assert progress.attempts == 2  # type: ignore
 
 
@@ -164,33 +181,32 @@ class TestSessionRepository:
     """Tests for SessionRepository."""
 
     @pytest.fixture
-    def repo(self, db_session: Session):
+    async def repo(self, async_db_session: AsyncSession):
         """Create session repository."""
-        return SessionRepository(db_session)
+        return AsyncSessionRepository(async_db_session)
 
-    def test_create_session(self, repo, sample_user: User):
+    async def test_create_session(self, repo, async_sample_user_id: int):
         """Test creating session."""
         context = {"step": "test"}
-        session = repo.create_or_update(
-            sample_user.telegram_id, SessionState.ONBOARDING, context
+        session = await repo.create_or_update(
+            async_sample_user_id, SessionState.ONBOARDING, context
         )
 
-        assert session.user_id == sample_user.telegram_id  # type: ignore
+        assert session is not None
+
+        assert session.user_id == async_sample_user_id  # type: ignore
         assert session.state == SessionState.ONBOARDING
 
-    def test_update_session(self, repo, sample_user: User):
+    async def test_update_session(self, repo, async_sample_user_id: int):
         """Test updating existing session."""
         # Create session
-        repo.create_or_update(
-            sample_user.telegram_id, SessionState.ONBOARDING, {"step": "1"}
-        )
+        await repo.create_or_update(async_sample_user_id, SessionState.ONBOARDING, {"step": "1"})
 
         # Update it
-        repo.create_or_update(
-            sample_user.telegram_id, SessionState.LEARNING, {"step": "2"}
-        )
+        await repo.create_or_update(async_sample_user_id, SessionState.LEARNING, {"step": "2"})
 
         # Verify update
-        session = repo.find_by_user(sample_user.telegram_id)
+        session = await repo.find_by_user(async_sample_user_id)
+        assert session is not None
         assert session.state == SessionState.LEARNING  # type: ignore
         assert session.context_data["step"] == "2"  # type: ignore

@@ -1,7 +1,7 @@
 """SQLAlchemy data models."""
 
 import enum
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
@@ -65,8 +65,13 @@ class User(Base):
     learning_goal = Column(Enum(LearningGoal), nullable=False)
     current_lesson_id = Column(Integer, ForeignKey("lesson.id"), nullable=True)
     assessment_score = Column(Integer, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -95,7 +100,7 @@ class Lesson(Base):
     theory_content = Column(JSON, nullable=False)
     examples = Column(JSON, nullable=False)
     exercises = Column(JSON, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     __table_args__ = (
         UniqueConstraint("skill_level", "order_index", name="uq_lesson_skill_level_order_index"),
@@ -117,7 +122,7 @@ class UserProgress(Base):
     status = Column(Enum(LessonStatus), nullable=False, default=LessonStatus.NOT_STARTED)
     attempts = Column(Integer, nullable=False, default=0)
     last_score = Column(Integer, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "lesson_id", name="uq_user_progress_user_lesson"),
@@ -141,7 +146,12 @@ class UserSession(Base):
     user_id = Column(BigInteger, ForeignKey("user.telegram_id"), primary_key=True)
     state = Column(Enum(SessionState), nullable=False)
     context_data = Column(JSON, nullable=False, default=dict)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
 
     __table_args__ = (Index("ix_user_session_updated_at", "updated_at"),)
 

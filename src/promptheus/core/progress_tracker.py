@@ -1,6 +1,6 @@
 """Progress tracking for user learning."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -34,7 +34,7 @@ class ProgressTracker:
         if progress:
             progress.status = LessonStatus.COMPLETED  # type: ignore
             progress.last_score = score  # type: ignore
-            progress.completed_at = datetime.utcnow()  # type: ignore
+            progress.completed_at = datetime.now(UTC)  # type: ignore
             logger.info("Lesson marked as completed", user_id=user_id, lesson_id=lesson_id)
         else:
             logger.warning(
@@ -59,7 +59,7 @@ class ProgressTracker:
         if progress:
             progress.status = LessonStatus.COMPLETED  # type: ignore
             progress.last_score = score  # type: ignore
-            progress.completed_at = datetime.utcnow()  # type: ignore
+            progress.completed_at = datetime.now(UTC)  # type: ignore
             logger.info(
                 "Lesson completed successfully", user_id=user_id, lesson_id=lesson_id, score=score
             )

@@ -3,7 +3,7 @@
 
 import asyncio
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -41,7 +41,7 @@ async def main():
     logger.info("Promptheus Session Cleanup")
     logger.info("=" * 60)
     logger.info(f"Cleaning sessions older than {days_old} days")
-    logger.info(f"Current time: {datetime.utcnow()}")
+    logger.info(f"Current time: {datetime.now(UTC)}")
     logger.info("=" * 60)
 
     await cleanup_sessions(days_old)

@@ -7,9 +7,9 @@ from loguru import logger
 
 from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.config import get_settings
-from promptheus.data.database import get_db
+from promptheus.data.async_repositories import AsyncLessonRepository
+from promptheus.data.database import get_async_db
 from promptheus.data.models import SkillLevel
-from promptheus.data.repositories import LessonRepository
 
 
 async def validate_configuration():
@@ -30,9 +30,9 @@ async def validate_database():
     """Validate database and lessons."""
     logger.info("Validating database...")
 
-    with get_db() as db:
-        lesson_repo = LessonRepository(db)
-        lessons = lesson_repo.find_by_skill_level(SkillLevel.BEGINNER)
+    async with get_async_db() as db:
+        lesson_repo = AsyncLessonRepository(db)
+        lessons = await lesson_repo.find_by_skill_level(SkillLevel.BEGINNER)
 
         if len(lessons) == 0:
             logger.warning("No lessons found in database!")

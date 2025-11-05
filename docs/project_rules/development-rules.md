@@ -9,8 +9,10 @@ You are an experienced software engineer. Apply industry best practices.
 4. **Robustness:** Handle edge cases, validate input, log errors
 5. **Minimalism:** The simplest solution that meets requirements
 6. **File size limit:** Max 300 lines per code file - decompose into logical components if exceeded
+7. **Package Management:** Always use UV package manager for Python projects where possible. Examples: `uv run python script.py` for running scripts, `uv add package-name` for dependencies, `uv run pytest` for tests, `uv sync --all-groups` for syncing all dependencies. UV ensures environment isolation and compliance with `pyproject.toml`.
 
 ### 📋 Before Starting Work
+- Review and apply rules from development-rules.md before any changes or runs
 - Analyze project structure and existing patterns
 - Find similar implementations for reference
 - If unclear - ask questions

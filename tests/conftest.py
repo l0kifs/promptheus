@@ -1,40 +1,74 @@
 """Test configuration and fixtures."""
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from promptheus.data.async_repositories import (
+    AsyncLessonRepository,
+    AsyncProgressRepository,
+    AsyncSessionRepository,
+    AsyncUserRepository,
+)
 from promptheus.data.database import Base
 from promptheus.data.models import LearningGoal, Lesson, SkillLevel, User
 
 
 @pytest.fixture(scope="session")
-def db_engine():
-    """Create in-memory SQLite engine for testing."""
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+def async_db_engine():
+    """Create async in-memory SQLite engine for testing."""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    return engine
 
-    # Create all tables
-    Base.metadata.create_all(engine)
 
-    yield engine
-    Base.metadata.drop_all(engine)
-    engine.dispose()
+@pytest.fixture(scope="session", autouse=True)
+async def setup_async_db(async_db_engine):
+    """Set up async database tables."""
+    async with async_db_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with async_db_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await async_db_engine.dispose()
 
 
 @pytest.fixture
-def db_session(db_engine):
-    """Create database session for testing."""
-    session_local = sessionmaker(bind=db_engine)
-    session = session_local()
+async def async_db_session(async_db_engine):
+    """Create async database session for testing."""
+    async_session_local = async_sessionmaker(bind=async_db_engine)
+    session = async_session_local()
     try:
         yield session
     finally:
-        session.close()
+        await session.close()
 
 
 @pytest.fixture
-def sample_user(db_session: Session) -> User:
-    """Create a sample user."""
+async def async_user_repo(async_db_session: AsyncSession) -> AsyncUserRepository:
+    """Create async user repository."""
+    return AsyncUserRepository(async_db_session)
+
+
+@pytest.fixture
+async def async_lesson_repo(async_db_session: AsyncSession) -> AsyncLessonRepository:
+    """Create async lesson repository."""
+    return AsyncLessonRepository(async_db_session)
+
+
+@pytest.fixture
+async def async_progress_repo(async_db_session: AsyncSession) -> AsyncProgressRepository:
+    """Create async progress repository."""
+    return AsyncProgressRepository(async_db_session)
+
+
+@pytest.fixture
+async def async_session_repo(async_db_session: AsyncSession) -> AsyncSessionRepository:
+    """Create async session repository."""
+    return AsyncSessionRepository(async_db_session)
+
+
+@pytest.fixture
+async def async_sample_user(async_db_session: AsyncSession) -> User:
+    """Create a sample user for async tests."""
     import random
 
     telegram_id = random.randint(100000, 999999)
@@ -45,47 +79,95 @@ def sample_user(db_session: Session) -> User:
         learning_goal=LearningGoal.PROFESSIONAL,
         assessment_score=50,
     )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
+    async_db_session.add(user)
+    await async_db_session.commit()
+    await async_db_session.refresh(user)
     return user
 
 
 @pytest.fixture
-def sample_lesson(db_session: Session) -> Lesson:
-    """Create a sample lesson."""
-    lesson = Lesson(
-        title="Test Lesson",
+async def async_sample_user_id(async_db_session: AsyncSession) -> int:
+    """Create a sample user ID for async tests."""
+    import random
+
+    telegram_id = random.randint(100000, 999999)
+    user = User(
+        telegram_id=telegram_id,
+        username="testuser",
         skill_level=SkillLevel.BEGINNER,
-        order_index=1,
+        learning_goal=LearningGoal.PROFESSIONAL,
+        assessment_score=50,
+    )
+    async_db_session.add(user)
+    await async_db_session.commit()
+    return telegram_id
+
+
+@pytest.fixture
+async def async_sample_lesson(async_db_session: AsyncSession) -> Lesson:
+    """Create a sample lesson for async tests."""
+    import random
+
+    title = f"Async Test Lesson {random.randint(10000, 99999)}"
+    order_index = random.randint(1000, 9999)  # Use random order_index to avoid conflicts
+    lesson = Lesson(
+        title=title,
+        skill_level=SkillLevel.BEGINNER,
+        order_index=order_index,
         tags=["test", "beginner"],
         theory_content={"sections": [{"content": "Test theory"}]},
         examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},
         exercises={"scenarios": [{"scenario": "Test scenario", "task": "Test task"}]},
     )
-    db_session.add(lesson)
-    db_session.commit()
-    db_session.refresh(lesson)
+    async_db_session.add(lesson)
+    await async_db_session.commit()
+    await async_db_session.refresh(lesson)
     return lesson
 
 
 @pytest.fixture
-def multiple_lessons(db_session: Session) -> list[Lesson]:
-    """Create multiple lessons for testing."""
-    lessons = [
-        Lesson(
-            title=f"Lesson {i}",
+async def async_sample_lesson_id(async_db_session: AsyncSession) -> int:
+    """Create a sample lesson ID for async tests."""
+    import random
+
+    title = f"Async Test Lesson {random.randint(10000, 99999)}"
+    order_index = random.randint(1000, 9999)  # Use random order_index to avoid conflicts
+    lesson = Lesson(
+        title=title,
+        skill_level=SkillLevel.BEGINNER,
+        order_index=order_index,
+        tags=["test", "beginner"],
+        theory_content={"sections": [{"content": "Test theory"}]},
+        examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},
+        exercises={"scenarios": [{"scenario": "Test scenario", "task": "Test task"}]},
+    )
+    async_db_session.add(lesson)
+    await async_db_session.commit()
+    await async_db_session.refresh(lesson)
+    return int(lesson.id)
+
+
+@pytest.fixture
+async def async_multiple_lessons(async_db_session: AsyncSession) -> list[Lesson]:
+    """Create multiple lessons for async testing."""
+    import random
+
+    lessons = []
+    for i in range(1, 4):
+        title = f"Async Test Lesson {random.randint(10000, 99999)} {i}"
+        order_index = random.randint(10000, 20000) + i  # Use random order_index to avoid conflicts
+        lesson = Lesson(
+            title=title,
             skill_level=SkillLevel.BEGINNER,
-            order_index=i,
-            tags=["test"],
-            theory_content={"sections": []},
-            examples={"comparisons": []},
-            exercises={"scenarios": []},
+            order_index=order_index,
+            tags=["test", "beginner"],
+            theory_content={"sections": [{"content": "Test theory"}]},
+            examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},
+            exercises={"scenarios": [{"scenario": "Test scenario", "task": "Test task"}]},
         )
-        for i in range(1, 4)
-    ]
-    db_session.add_all(lessons)
-    db_session.commit()
+        lessons.append(lesson)
+    async_db_session.add_all(lessons)
+    await async_db_session.commit()
     for lesson in lessons:
-        db_session.refresh(lesson)
+        await async_db_session.refresh(lesson)
     return lessons

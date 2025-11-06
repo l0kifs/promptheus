@@ -139,21 +139,134 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 
 ---
 
-## 4. Progress and Navigation
+## 3. Practice and Feedback
 
-### US-4.1: View Progress
+### US-3.1: Complete Practice Exercise
 **As** a user  
-**I want** to see my learning progress  
+**I want** to practice the acquired knowledge  
+**So that** I can reinforce my understanding of the technique
+
+**Acceptance Criteria:**
+- Exercise scenario displayed (≤100 words)
+- Task clearly formulated
+- Instruction to send prompt in next message
+- "💡 Show Hint" and "⏭️ Skip" buttons available
+- `attempts` counter in `UserProgress` is incremented
+
+### US-3.2: AI Evaluation of User Prompt
+**As** a user  
+**I want** to receive instant feedback on my prompt  
+**So that** I understand what was done well and what needs improvement
+
+**Acceptance Criteria:**
+- "⏳ Analyzing..." indicator shown after prompt submission
+- Request sent to OpenRouter API (model `llama-4-scout:free`)
+- Response structured: score 0-10, what's missing, what's good
+- On API error, fallback to `gemini-2.5-pro-exp:free`
+- `last_score` in `UserProgress` is updated
+- Response time ≤10 seconds, otherwise timeout message
+
+### US-3.3: Minimum Score Enforcement
+**As** a user  
+**I want** to achieve a minimum score of 7/10  
+**So that** I can complete a lesson and demonstrate mastery
+
+**Acceptance Criteria:**
+- If score < 7/10, "🔄 Try Again" button displayed (completion not allowed)
+- If score ≥ 7/10, both "✅ Lesson Complete" and "🔄 Try Again" buttons shown
+- Clear message explaining 7/10 threshold when score is insufficient
+- Feedback includes specific improvements needed to reach threshold
+- `last_score` in `UserProgress` must be ≥ 7 before marking lesson as completed
+
+### US-3.4: Receive Improved Version
+**As** a user  
+**I want** to see the correct prompt variant  
+**So that** I can compare with mine and understand improvement direction
+
+**Acceptance Criteria:**
+- Improved prompt version displayed
+- Key additions listed (role, context, format)
+- "🔄 Try Again" (new attempt) and "✅ Lesson Completed" (if score ≥ 7) buttons available
+- On completion, lesson status changes to `completed`
+- `completed_at` timestamp is set
+
+---
+
+## 4. Skill Level Progression
+
+### US-4.1: Level Completion Detection
+**As** a user  
+**I want** the system to detect when I complete all lessons in my current level  
+**So that** I am prompted about advancement opportunities
+
+**Acceptance Criteria:**
+- System detects when user clicks "Lesson Complete" on last lesson in current skill level
+- Level completion message is displayed with performance statistics
+- No automatic level change occurs (user choice required)
+- System calculates average score across all completed lessons in the level
+- Appropriate flow shown based on qualification (qualified vs. need retry)
+
+### US-4.2: Qualified Level Advancement
+**As** a user who achieved ≥7/10 average  
+**I want** to choose whether to advance or retry  
+**So that** I have autonomy in my learning path
+
+**Acceptance Criteria:**
+- Celebration message shown with achievement stats (avg score, completed lessons, time invested)
+- "🚀 Advance to [Next Level]" button displayed
+- "🔄 Retry for Perfection" button available as alternative
+- "📊 View Progress" button for detailed stats
+- On advance click, `skill_level` updated in database
+- `current_lesson_id` set to NULL on advancement
+- New level lesson list displayed after advancement
+
+### US-4.3: Retry Required for Advancement
+**As** a user who achieved <7/10 average  
+**I want** to be informed that I need better scores  
+**So that** I understand what's required to advance
+
+**Acceptance Criteria:**
+- Message clearly states average score is below 7/10 threshold
+- Encouragement message with focus on improvement
+- List of lessons with lower scores shown (target for retry)
+- "🔄 Retry Lessons" button leads to lesson list
+- "📊 View Progress" button for detailed stats
+- No "Advance" button shown until threshold met
+- Clear indication of current average vs. required average (7/10)
+
+### US-4.4: Final Level Completion
+**As** a user who completes Advanced level  
+**I want** to receive a celebratory final message  
+**So that** I feel accomplished and know what's next
+
+**Acceptance Criteria:**
+- "Prompt Master" celebration message displayed
+- Final statistics shown (all levels, overall average, total lessons)
+- Completion acknowledgment as Prompt Engineering Expert
+- Options to review lessons, see final stats, or start fresh
+- No "advance" option shown (no higher level exists)
+- Achievement milestone recorded in user history
+
+---
+
+## 5. Progress and Navigation
+
+### US-5.1: View Progress
+**As** a user  
+**I want** to see my learning progress across all skill levels  
 **So that** I can track achievements and stay motivated
 
 **Acceptance Criteria:**
-- Current level (`skill_level`) displayed
-- Number of completed lessons shown
-- Average score calculated from `last_score` of all completed lessons
+- Current level (`skill_level`) displayed prominently
+- Progress shown for all skill levels (Beginner, Intermediate, Advanced)
+- Number of completed lessons per level shown
+- Average score per level calculated and displayed
+- Overall statistics visible (total completed, overall average)
 - Last studied lesson indicated with date
 - "▶️ Continue" and "📋 All Lessons" buttons
+- Visual distinction between current level and others
 
-### US-4.2: Resume After Break
+### US-5.2: Resume After Break
 **As** a returning user  
 **I want** to continue from where I left off  
 **So that** I don't waste time on navigation
@@ -164,8 +277,9 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 - Lesson and section from session `context_data` indicated
 - "▶️ Continue" button returns to stopping point
 - Alternative "📚 Main Menu" button
+- Current skill level clearly shown in welcome message
 
-### US-4.3: Main Menu
+### US-5.3: Main Menu
 **As** a user  
 **I want** to have a central navigation point  
 **So that** I can quickly access needed sections
@@ -311,19 +425,22 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 ### Must Have (MVP v1.0)
 - US-1.1, US-1.2, US-1.3: Onboarding
 - US-2.1, US-2.2, US-2.3, US-2.4: Lesson Learning
-- US-3.1, US-3.2, US-3.3: Practice
-- US-4.1, US-4.2, US-4.3: Navigation
-- US-5.1, US-5.2: Basic error handling
-- US-6.1, US-6.2: AI integration
+- US-3.1, US-3.2, US-3.3, US-3.4: Practice with minimum score enforcement
+- US-4.1, US-4.2, US-4.3, US-4.4: Skill level progression
+- US-5.1, US-5.2, US-5.3: Navigation with multi-level progress
+- US-6.1, US-6.2: Basic error handling
+- US-7.1, US-7.2: AI integration
 
 ### Should Have (v1.1)
-- US-5.3: Session cleanup
-- US-7.2: Caching
-- US-8.1: Basic analytics
+- US-6.3: Session cleanup
+- US-8.2: Caching
+- US-9.1: Basic analytics
 
 ### Could Have (v1.2+)
-- US-7.1: PostgreSQL migration
-- US-8.2: Detailed AI analytics
+- US-8.1: PostgreSQL migration
+- US-9.2: Detailed AI analytics
+- Skill decay detection
+- Review recommendations
 
 ---
 
@@ -331,7 +448,9 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 
 **User Metrics:**
 - 50+ users complete onboarding (1 month)
-- 30% lesson completion rate
+- 30% lesson completion rate per skill level
+- 40%+ progression rate from beginner to intermediate
+- 25%+ progression rate from intermediate to advanced
 - Average session >5 minutes
 - 7-day retention >40%
 
@@ -345,3 +464,4 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 - $0 AI costs (MVP on free tier)
 - Ready to scale to 1000 users
 - Positive feedback >80%
+- Average score improvement of 2+ points per level

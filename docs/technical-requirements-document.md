@@ -34,8 +34,18 @@
 - **Lesson Structure**: Theory → Examples → Practice → Feedback → Next Steps
 - **Navigation**: Forward/Back navigation, lesson menu, progress overview
 - **Resume Capability**: Continue from last checkpoint
+- **Level Progression**: Completion detection → Eligibility check → User choice → Level advancement
 
-#### 2.3 Content Delivery
+#### 2.3 Skill Level Progression (New Feature)
+- **Minimum Score Enforcement**: Require ≥7/10 score on practice exercises before lesson completion
+- **Level Completion Detection**: Automatically detect when all lessons in current skill level are completed
+- **Eligibility Calculation**: Calculate average score across all completed lessons in current level
+- **Qualification Threshold**: User qualifies for next level if average score ≥7/10
+- **User Advancement Choice**: Qualified users choose to advance or retry for better scores
+- **Level Update**: Update user's skill_level field and clear current_lesson_id on advancement
+- **Multi-Level Progress**: Display progress statistics for all skill levels (Beginner, Intermediate, Advanced)
+
+#### 2.4 Content Delivery
 - **Theory Modules**: Bite-sized explanations (50-80 words per message, split into multiple messages if needed)
 - **Examples**: Good vs. Bad prompt comparisons with brief annotations (2-3 sentences each)
 - **Exercises**: Scenario-based tasks with clear objectives (max 100 words)
@@ -48,8 +58,8 @@
   - Alternative: `mistralai/mistral-small-3.1-24b-instruct:free` (96K context, function calling)
   - Lightweight: `qwen/qwen2.5-vl-3b-instruct:free` (3B, multimodal for examples)
 - **Model Strategy**: Start with free tier, migrate to paid models based on usage metrics and revenue
-- **Prompt Templates**: Structured templates for assessment, feedback, content generation
-- **Response Parsing**: Extract structured data from AI responses
+- **Prompt Templates**: Structured templates for assessment, feedback, content generation, and score evaluation
+- **Response Parsing**: Extract structured data from AI responses, including score (0-10) and improvements
 - **Error Handling**: Multi-model fallback chain (primary → fallback → alternative)
 
 ### 3. Non-Functional Requirements
@@ -170,15 +180,30 @@
 ### 6. MVP Scope
 
 #### 5.1 MVP Scope
-- 5 foundational lessons (managed in private promptheus-content repository):
-  1. Introduction to Prompt Engineering
-  2. Defining AI Roles
-  3. Providing Context
-  4. Setting Clear Objectives
-  5. Specifying Output Format
-- Practice exercises (1 per lesson)
-- AI-powered feedback on user prompts
+- 5 foundational lessons per skill level (managed in private promptheus-content repository):
+  - **Beginner** (5 lessons):
+    1. Introduction to Prompt Engineering
+    2. Defining AI Roles
+    3. Providing Context
+    4. Setting Clear Objectives
+    5. Specifying Output Format
+  - **Intermediate** (5 lessons):
+    6. Chain of Thought Prompting
+    7. Few-Shot Learning
+    8. Constraint-Based Prompting
+    9. Iterative Refinement
+    10. Multi-Step Task Decomposition
+  - **Advanced** (5 lessons):
+    11. Meta-Prompting and Self-Reflection
+    12. Prompt Chaining and Workflows
+    13. Adversarial Prompting and Edge Cases
+    14. Persona and Perspective Engineering
+    15. Dynamic Context Management
+- Practice exercises (1 per lesson) with minimum 7/10 score requirement
+- AI-powered feedback on user prompts with structured evaluation
 - Progress tracking and resume capability
+- Skill level progression system with user choice
+- Multi-level progress visualization
 
 #### 6.2 Excluded from MVP
 - Advanced techniques (chain-of-thought, meta-prompting)
@@ -275,8 +300,11 @@ TEMPERATURE_FEEDBACK=0.5
 
 #### 11.1 Metrics
 - User engagement (daily/weekly active users)
-- Lesson completion rates
+- Lesson completion rates per skill level
+- Level progression rates (% users advancing from beginner to intermediate, etc.)
 - Average session duration
+- Average scores per skill level
+- Retry rates per lesson (measure of difficulty appropriateness)
 - API response times and error rates
 - API usage metrics:
   - Requests per model (primary/fallback/alternative)

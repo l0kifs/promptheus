@@ -62,6 +62,8 @@
 - `telegram_id` must match authenticated Telegram user
 - `skill_level` and `learning_goal` set during onboarding
 - `current_lesson_id` updated on lesson start, nullified on completion
+- **Skill Level Progression**: `skill_level` updated when user advances to next level (Beginner → Intermediate → Advanced)
+- **Level Advancement**: Requires average score ≥7/10 across all completed lessons in current level
 
 ---
 
@@ -155,6 +157,8 @@
 - `completed_at` set when status changes to `completed`
 - `attempts` incremented on each exercise submission
 - `last_score` updated with AI evaluation result
+- **Minimum Score Requirement**: Lesson can only be marked `completed` if `last_score` ≥ 7
+- **Level Eligibility**: Average of all `last_score` values for completed lessons in a skill level determines advancement eligibility (threshold: ≥7.0)
 
 ---
 
@@ -207,12 +211,27 @@ SELECT * FROM Lesson
 WHERE skill_level = ? AND order_index > ? 
 ORDER BY order_index ASC LIMIT 1;
 
--- Get user progress summary
-SELECT l.title, up.status, up.last_score, up.completed_at
+-- Check if last lesson in level (for progression detection)
+SELECT COUNT(*) FROM Lesson
+WHERE skill_level = ? AND order_index > ?;
+
+-- Calculate level eligibility (average score for current level)
+SELECT AVG(up.last_score) as avg_score, COUNT(*) as completed
+FROM UserProgress up
+JOIN Lesson l ON up.lesson_id = l.id
+WHERE up.user_id = ? AND l.skill_level = ? AND up.status = 'completed'
+AND up.last_score IS NOT NULL;
+
+-- Get user progress summary (all levels)
+SELECT l.skill_level, 
+       COUNT(*) as total,
+       COUNT(CASE WHEN up.status = 'completed' THEN 1 END) as completed,
+       AVG(up.last_score) as avg_score
 FROM UserProgress up
 JOIN Lesson l ON up.lesson_id = l.id
 WHERE up.user_id = ?
-ORDER BY l.order_index;
+GROUP BY l.skill_level
+ORDER BY l.skill_level;
 ```
 
 #### 4.2 Write Queries (Medium Frequency)
@@ -243,6 +262,20 @@ FROM Lesson l
 LEFT JOIN UserProgress up ON l.id = up.lesson_id
 GROUP BY l.id, l.title;
 
+-- Level progression rates
+SELECT 
+    COUNT(DISTINCT CASE WHEN skill_level = 'beginner' THEN telegram_id END) as beginners,
+    COUNT(DISTINCT CASE WHEN skill_level = 'intermediate' THEN telegram_id END) as intermediate,
+    COUNT(DISTINCT CASE WHEN skill_level = 'advanced' THEN telegram_id END) as advanced
+FROM User;
+
+-- Average scores per level
+SELECT l.skill_level, AVG(up.last_score) as avg_score
+FROM UserProgress up
+JOIN Lesson l ON up.lesson_id = l.id
+WHERE up.status = 'completed' AND up.last_score IS NOT NULL
+GROUP BY l.skill_level;
+
 -- User retention (7-day)
 SELECT COUNT(DISTINCT user_id) as active_users
 FROM UserSession
@@ -251,7 +284,52 @@ WHERE updated_at > NOW() - INTERVAL '7 days';
 
 ---
 
-### 5. Migration Strategy
+### 5. Skill Level Progression Implementation Notes
+
+#### 5.1 No Schema Changes Required ✅
+The existing schema fully supports skill level progression:
+- `User.skill_level` can be updated for level advancement
+- `User.current_lesson_id` can be set to NULL when advancing
+- `UserProgress.last_score` stores scores for eligibility calculation
+- `UserProgress.status` tracks lesson completion
+
+#### 5.2 New Repository Methods Needed
+Add to `AsyncUserRepository`:
+- `update_skill_level(telegram_id, new_level)` - Already exists! ✅
+
+Add to `ProgressTracker`:
+- `check_level_eligibility(user_id, current_level)` - Calculate avg score for level
+- `get_level_statistics(user_id, skill_level)` - Detailed stats per level
+
+#### 5.3 Key Calculations
+**Level Eligibility Check**:
+```python
+# Average score for current level
+avg_score = AVG(last_score) 
+FROM UserProgress up
+JOIN Lesson l ON up.lesson_id = l.id
+WHERE up.user_id = ? 
+  AND l.skill_level = ?
+  AND up.status = 'completed'
+  AND up.last_score IS NOT NULL
+
+# User qualifies if avg_score >= 7.0
+```
+
+**Level Completion Detection**:
+```python
+# Check if current lesson is last in level
+next_lesson = SELECT * FROM Lesson
+WHERE skill_level = current_level 
+  AND order_index > current_order
+LIMIT 1
+
+# If next_lesson is NULL → last lesson in level
+```
+
+---
+
+### 6. Migration Strategy
 
 #### 5.1 SQLite → PostgreSQL Differences
 | Feature | SQLite | PostgreSQL |

@@ -57,15 +57,34 @@ Based on established prompt engineering principles:
 
 ## Development Strategy
 
-### MVP Scope
+## MVP Scope
 Core functionality for initial release:
 - User onboarding and skill assessment
-- Basic curriculum with 3-5 foundational lessons
+- Basic curriculum with 3-5 foundational lessons per skill level (beginner/intermediate/advanced)
 - Practice exercises with AI feedback
-- Progress tracking
+- Progress tracking with skill level progression system
+- Minimum score requirement (7/10) for lesson completion
+- Automatic level qualification based on performance
+- User choice to advance or retry lessons
 - Simple conversational interface
 
-### Post-MVP Enhancements
+## Skill Level Progression System (MVP)
+**Purpose**: Enable users to progress through skill levels (Beginner → Intermediate → Advanced) based on demonstrated competency
+
+**Key Components**:
+- **Minimum Score Enforcement**: Users must achieve ≥7/10 score on practice exercises to complete lessons
+- **Level Completion Detection**: System detects when all lessons in current skill level are completed
+- **Eligibility Check**: Users qualify for next level with average score ≥7/10 across all completed lessons
+- **User Choice**: Qualified users can choose to advance or retry for better scores
+- **Achievement Celebration**: Meaningful stats and progress visualization on level completion
+
+**Research-Backed Approach**:
+- 70-80% competency threshold aligns with mastery learning research
+- User autonomy in advancement supports self-determination theory
+- Progressive disclosure reduces cognitive overload
+- Celebration moments increase motivation and retention
+
+## Post-MVP Enhancements
 Feature expansion based on user feedback:
 - Advanced techniques (meta-prompting, prompt chaining)
 - Community features (shared prompts, leaderboards)
@@ -73,11 +92,15 @@ Feature expansion based on user feedback:
 - Analytics dashboard
 - Integration with popular AI platforms
 - Certification system
+- Skill decay detection and review recommendations
 
 ## Success Metrics
-- User completion rates for lessons
+- User completion rates for lessons (target: 30%+ per level)
+- Level progression rate (target: 40%+ advance to intermediate)
 - Improvement in prompt quality (measured by AI evaluation)
-- User retention and engagement
+- Average score per level (target: ≥7.5/10)
+- User retention and engagement (target: 40%+ 7-day retention)
+- Lesson retry rate (measure of challenge appropriateness)
 - Qualitative feedback on learning outcomes
 
 ## Design Principles

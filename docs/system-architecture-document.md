@@ -57,10 +57,11 @@
 **Responsibility**: Orchestrate business logic and learning flows
 
 **Components**:
-- **Learning Flow Orchestrator**: Manages lesson progression, navigation, resume capability
+- **Learning Flow Orchestrator**: Manages lesson progression, navigation, resume capability, level completion detection
 - **Content Delivery Manager**: Chunks content into mobile-optimized messages (50-80 words)
 - **Assessment Engine**: Evaluates user skill level, generates personalized paths
-- **Progress Tracker**: Records completion, calculates scores, manages checkpoints
+- **Progress Tracker**: Records completion, calculates scores, manages checkpoints, checks level eligibility
+- **Level Progression Manager**: Handles level completion, eligibility checks, advancement logic
 
 **Key Interactions**:
 - Receives commands from Bot Interface Layer
@@ -134,11 +135,36 @@ User Prompt → Bot Handler → Assessment Engine
                                   ↓
                           AI Integration → OpenRouter API
                                   ↓
-                          Response Parser
+                          Response Parser (score 0-10)
                                   ↓
                           Progress Tracker → Database
                                   ↓
+                          Check if score ≥ 7/10
+                                  ↓
                           Feedback Message → User
+                          (allow completion if qualified)
+```
+
+#### 3.4 Level Progression Flow
+```
+User Completes Lesson → Bot Handler → Flow Orchestrator
+                                           ↓
+                                   Check if last lesson
+                                           ↓
+                                   Progress Tracker
+                                           ↓
+                              Calculate avg score for level
+                                           ↓
+                              Check if avg ≥ 7/10
+                                           ↓
+                          Level Completion Message
+                          (qualified or retry required)
+                                           ↓
+                          User Chooses → Advance or Retry
+                                           ↓
+                          Update skill_level → Database
+                                           ↓
+                          Show new level lessons → User
 ```
 
 ### 4. Data Flow

@@ -250,3 +250,77 @@ class TestMessageFormatter:
 
         loading = MessageFormatter.format_loading()
         assert "Processing" in loading
+
+    def test_chunk_text_by_words_typical_content(self):
+        """Test chunking of normal-length content."""
+        text = " ".join([f"word{i}" for i in range(150)])  # 150 words
+        chunks = MessageFormatter.chunk_text_by_words(text)
+
+        assert len(chunks) >= 2  # Should split into multiple chunks
+        for chunk in chunks:
+            words_in_chunk = len(chunk.split())
+            assert 50 <= words_in_chunk <= 80
+
+    def test_chunk_text_by_words_short_content(self):
+        """Test chunking of short content."""
+        text = "This is a short piece of content with only thirty words that should not be split."
+        chunks = MessageFormatter.chunk_text_by_words(text)
+
+        assert len(chunks) == 1  # Should not split short content
+        assert len(chunks[0].split()) <= 80
+
+    def test_chunk_text_by_words_empty_content(self):
+        """Test chunking of empty content."""
+        chunks = MessageFormatter.chunk_text_by_words("")
+        assert chunks == []
+
+        chunks = MessageFormatter.chunk_text_by_words("   ")
+        assert chunks == []
+
+    def test_chunk_text_by_words_preserves_sentences(self):
+        """Test that chunking tries to preserve sentence boundaries when possible."""
+        text = "This is the first sentence. This is the second sentence with more words to make it longer. This is the third sentence."
+        chunks = MessageFormatter.chunk_text_by_words(text, max_words=12)
+
+        # Should create multiple chunks
+        assert len(chunks) >= 2
+        # At least one chunk should end with sentence punctuation (if sentences are long enough)
+        has_sentence_end = any(
+            chunk.strip().endswith(".")
+            or chunk.strip().endswith("!")
+            or chunk.strip().endswith("?")
+            for chunk in chunks
+        )
+        # Either we have sentence endings or the text is short enough to not split
+        assert has_sentence_end or len(chunks) == 1
+
+    def test_chunk_text_by_words_long_content(self):
+        """Test chunking of very long content."""
+        # Create content longer than several chunks
+        text = " ".join([f"This is sentence number {i} in a long text." for i in range(50)])
+        chunks = MessageFormatter.chunk_text_by_words(text, max_words=60)
+
+        assert len(chunks) >= 3  # Should split into multiple chunks
+        total_words = sum(len(chunk.split()) for chunk in chunks)
+        assert total_words == len(text.split())  # All words preserved
+
+    def test_chunk_text_by_words_custom_limits(self):
+        """Test chunking with custom word limits."""
+        text = " ".join([f"word{i}" for i in range(100)])
+        chunks = MessageFormatter.chunk_text_by_words(text, min_words=20, max_words=40)
+
+        assert len(chunks) >= 3  # Should split into more chunks with smaller max
+        for chunk in chunks[:-1]:  # All chunks except last should meet min_words
+            assert len(chunk.split()) >= 20
+        for chunk in chunks:
+            assert len(chunk.split()) <= 40
+
+    def test_chunk_text_by_words_single_word_chunks(self):
+        """Test chunking with very small limits."""
+        text = "word1 word2 word3 word4 word5"
+        chunks = MessageFormatter.chunk_text_by_words(text, min_words=1, max_words=2)
+
+        assert len(chunks) >= 2
+        for chunk in chunks:
+            words_in_chunk = len(chunk.split())
+            assert 1 <= words_in_chunk <= 2

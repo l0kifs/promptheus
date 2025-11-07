@@ -41,8 +41,8 @@ class CommandHandlersMixin:
                     resume_text += f"Current step: {lesson_step.title()}"
 
                     if lesson_step == "theory":
-                        theory_section = session_context.get("theory_section", 0)
-                        resume_text += f" (Section {theory_section + 1})"
+                        theory_chunk = session_context.get("theory_chunk", 0)
+                        resume_text += f" (Chunk {theory_chunk + 1})"
 
                     keyboard = [
                         [InlineKeyboardButton("▶️ Continue", callback_data="continue")],

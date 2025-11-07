@@ -40,8 +40,8 @@ class ProgressHandlersMixin:
                 resume_text += f"Current step: {lesson_step.title()}"
 
                 if lesson_step == "theory":
-                    theory_section = session_context.get("theory_section", 0)
-                    resume_text += f" (Section {theory_section + 1})"
+                    theory_chunk = session_context.get("theory_chunk", 0)
+                    resume_text += f" (Chunk {theory_chunk + 1})"
                     callback_data = f"lesson_start_{lesson.id}"
                 elif lesson_step == "examples":
                     callback_data = f"examples_{lesson.id}"

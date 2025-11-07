@@ -45,25 +45,45 @@ async def async_db_session(async_db_engine):
 @pytest.fixture
 async def async_user_repo(async_db_session: AsyncSession) -> AsyncUserRepository:
     """Create async user repository."""
-    return AsyncUserRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncUserRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
 async def async_lesson_repo(async_db_session: AsyncSession) -> AsyncLessonRepository:
     """Create async lesson repository."""
-    return AsyncLessonRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncLessonRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
 async def async_progress_repo(async_db_session: AsyncSession) -> AsyncProgressRepository:
     """Create async progress repository."""
-    return AsyncProgressRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncProgressRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
 async def async_session_repo(async_db_session: AsyncSession) -> AsyncSessionRepository:
     """Create async session repository."""
-    return AsyncSessionRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncSessionRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
@@ -144,7 +164,7 @@ async def async_sample_lesson_id(async_db_session: AsyncSession) -> int:
     async_db_session.add(lesson)
     await async_db_session.commit()
     await async_db_session.refresh(lesson)
-    return int(lesson.id)
+    return lesson.id  # type: ignore
 
 
 @pytest.fixture

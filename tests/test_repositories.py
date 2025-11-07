@@ -26,7 +26,12 @@ class TestUserRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create user repository."""
-        return AsyncUserRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncUserRepository(session_maker)  # type: ignore
 
     async def test_create_user(self, repo, async_db_session: AsyncSession):
         """Test creating a new user."""
@@ -79,7 +84,12 @@ class TestLessonRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create lesson repository."""
-        return AsyncLessonRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncLessonRepository(session_maker)  # type: ignore
 
     async def test_create_lesson(self, repo, async_db_session: AsyncSession):
         """Test creating a new lesson."""
@@ -139,7 +149,12 @@ class TestProgressRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create progress repository."""
-        return AsyncProgressRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncProgressRepository(session_maker)  # type: ignore
 
     async def test_create_progress(
         self, repo, async_sample_user_id: int, async_sample_lesson_id: int
@@ -149,7 +164,7 @@ class TestProgressRepository:
 
         assert progress.user_id == async_sample_user_id  # type: ignore
         assert progress.lesson_id == async_sample_lesson_id  # type: ignore
-        assert progress.status == LessonStatus.IN_PROGRESS
+        assert progress.status == LessonStatus.NOT_STARTED
 
     async def test_find_by_user_and_lesson(
         self, repo, async_sample_user_id: int, async_sample_lesson_id: int
@@ -183,7 +198,12 @@ class TestSessionRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create session repository."""
-        return AsyncSessionRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncSessionRepository(session_maker)  # type: ignore
 
     async def test_create_session(self, repo, async_sample_user_id: int):
         """Test creating session."""

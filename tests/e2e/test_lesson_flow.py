@@ -50,6 +50,18 @@ class TestLessonFlowE2E:
         bot_handlers.progress_tracker.start_lesson = mocker.AsyncMock()
         bot_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
         bot_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
+        bot_handlers.progress_tracker.mark_in_progress = mocker.AsyncMock()
+        bot_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
+
+        # Mock formatter chunking method
+        mocker.patch.object(
+            bot_handlers.formatter,
+            "chunk_text_by_words",
+            return_value=[
+                "Prompt engineering is the art of crafting effective prompts for AI models...",
+                "Because AI needs clear instructions to produce good results...",
+            ],
+        )
 
         # Mock learning orchestrator methods
         bot_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
@@ -115,13 +127,13 @@ class TestLessonFlowE2E:
         mock_progress_repo.update_score = mocker.AsyncMock()
 
         # Mock AI evaluation for practice
-        bot_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
-            return_value={
-                "score": 8,
-                "strengths": ["Clear task description", "Good structure"],
-                "improvements": ["Add more context"],
-            }
-        )
+        mock_assessment_engine = mocker.AsyncMock()
+        mock_assessment_engine.evaluate_user_prompt.return_value = {
+            "score": 8,
+            "strengths": ["Clear task description", "Good structure"],
+            "improvements": ["Add more context"],
+        }
+        bot_handlers.assessment_engine = mock_assessment_engine
 
         # Step 1: Show lesson list
         await bot_handlers.lesson_list_callback(existing_user_update, existing_user_context)

@@ -16,14 +16,14 @@ class ProgressTracker:
         self.progress_repo = progress_repo
 
     async def start_lesson(self, user_id: int, lesson_id: int) -> None:
-        """Start a lesson for user."""
+        """Start a lesson for user - creates progress record as NOT_STARTED."""
         logger.info("Starting lesson", user_id=user_id, lesson_id=lesson_id)
         progress = await self.progress_repo.find_by_user_and_lesson(user_id, lesson_id)
         if not progress:
             await self.progress_repo.create(user_id, lesson_id)
-            logger.info("Lesson started (new progress)", user_id=user_id, lesson_id=lesson_id)
+            logger.info("Lesson progress initialized", user_id=user_id, lesson_id=lesson_id)
         else:
-            logger.debug("Lesson already started", user_id=user_id, lesson_id=lesson_id)
+            logger.debug("Lesson already has progress record", user_id=user_id, lesson_id=lesson_id)
 
     async def mark_completed(self, user_id: int, lesson_id: int, score: int) -> None:
         """Mark lesson as completed."""
@@ -85,3 +85,9 @@ class ProgressTracker:
         )
 
         return summary
+
+    async def mark_in_progress(self, user_id: int, lesson_id: int) -> None:
+        """Mark lesson as in progress when user starts reading theory."""
+        logger.info("Marking lesson as in progress", user_id=user_id, lesson_id=lesson_id)
+        await self.progress_repo.update_status(user_id, lesson_id, LessonStatus.IN_PROGRESS)
+        logger.info("Lesson marked as in progress", user_id=user_id, lesson_id=lesson_id)

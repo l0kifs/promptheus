@@ -289,10 +289,11 @@ class TestProgressTracker:
 
         await tracker.mark_completed(user_id, lesson_id, score)
 
-        # Verify the progress was updated
-        assert mock_progress.status == LessonStatus.COMPLETED
-        assert mock_progress.last_score == score
-        assert mock_progress.completed_at is not None
+        # Verify the repo methods were called
+        tracker.progress_repo.update_status.assert_called_once_with(
+            user_id, lesson_id, LessonStatus.COMPLETED
+        )
+        tracker.progress_repo.update_score.assert_called_once_with(user_id, lesson_id, score)
 
     @pytest.mark.asyncio
     async def test_record_attempt(self, tracker):

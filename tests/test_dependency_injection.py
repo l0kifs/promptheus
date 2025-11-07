@@ -94,8 +94,7 @@ class TestDependencyContainer:
         repo = await container.get_user_repository()
 
         assert isinstance(repo, AsyncUserRepository)
-        assert repo.db is mock_session
-        mock_session_maker.assert_called_once()
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_lesson_repository(self, container, mock_session_maker):
@@ -107,7 +106,7 @@ class TestDependencyContainer:
         repo = await container.get_lesson_repository()
 
         assert isinstance(repo, AsyncLessonRepository)
-        assert repo.db is mock_session
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_progress_repository(self, container, mock_session_maker):
@@ -119,7 +118,7 @@ class TestDependencyContainer:
         repo = await container.get_progress_repository()
 
         assert isinstance(repo, AsyncProgressRepository)
-        assert repo.db is mock_session
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_session_repository(self, container, mock_session_maker):
@@ -131,7 +130,7 @@ class TestDependencyContainer:
         repo = await container.get_session_repository()
 
         assert isinstance(repo, AsyncSessionRepository)
-        assert repo.db is mock_session
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_learning_flow_orchestrator(self, container, mock_session_maker):

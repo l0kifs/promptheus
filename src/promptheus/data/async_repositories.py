@@ -243,7 +243,7 @@ class AsyncProgressRepository:
             progress = UserProgress(
                 user_id=user_id,
                 lesson_id=lesson_id,
-                status=LessonStatus.IN_PROGRESS,
+                status=LessonStatus.NOT_STARTED,  # Changed from IN_PROGRESS to NOT_STARTED
             )
             session.add(progress)
             await session.flush()

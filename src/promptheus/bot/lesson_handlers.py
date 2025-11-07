@@ -135,7 +135,7 @@ class LessonHandlersMixin:
             )
             return
 
-        # Get theory content
+        # Get theory content and create chunks
         theory_content = lesson.theory_content  # type: ignore
         sections = theory_content.get("sections", [])
 
@@ -145,20 +145,33 @@ class LessonHandlersMixin:
             )
             return
 
-        # Store current position in session context
+        # Combine all section content and chunk it
+        full_theory_text = " ".join(section["content"] for section in sections)
+        theory_chunks = self.formatter.chunk_text_by_words(full_theory_text)
+
+        if not theory_chunks:
+            await update.callback_query.edit_message_text(
+                self.formatter.format_error("No theory content available")
+            )
+            return
+
+        # Store chunks and current position in session context
         session_context["current_lesson_id"] = lesson_id
-        session_context["theory_section"] = 0
+        session_context["theory_chunks"] = theory_chunks
+        session_context["theory_chunk"] = 0
         session_context["lesson_step"] = "theory"
 
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
 
-        # Show first theory section
-        first_section = sections[0]
-        total_sections = len(sections)
+        # Mark lesson as in progress when user starts reading theory
+        await self.progress_tracker.mark_in_progress(user_id, lesson_id)
+
+        # Show first theory chunk
+        total_chunks = len(theory_chunks)
 
         keyboard = []
-        if total_sections > 1:
+        if total_chunks > 1:
             keyboard.append(
                 [InlineKeyboardButton("Next ➡️", callback_data=f"theory_next_{lesson_id}")]
             )
@@ -169,7 +182,7 @@ class LessonHandlersMixin:
         keyboard.append([InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")])
 
         await update.callback_query.edit_message_text(
-            f"💡 *Theory* (1/{total_sections})\n\n{first_section['content']}",
+            f"💡 *Theory* (1/{total_chunks})\n\n{theory_chunks[0]}",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
@@ -177,7 +190,7 @@ class LessonHandlersMixin:
     async def theory_next_callback(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        """Handle next theory section button."""
+        """Handle next theory chunk button."""
         if not update.effective_user or not update.callback_query:
             return
 
@@ -190,24 +203,13 @@ class LessonHandlersMixin:
 
         # Load session context
         session_context = await self.learning_orchestrator.get_session_context(user_id)
-        # context.user_data.update(session_context)  # Removed: using DB session instead
 
-        # Get current section from session context
-        current_section = session_context.get("theory_section", 0)
-        next_section = current_section + 1
+        # Get current chunk from session context
+        current_chunk = session_context.get("theory_chunk", 0)
+        theory_chunks = session_context.get("theory_chunks", [])
+        next_chunk = current_chunk + 1
 
-        lesson = await self.learning_orchestrator.lesson_repo.find_by_id(lesson_id)
-
-        if not lesson:
-            await update.callback_query.edit_message_text(
-                self.formatter.format_error("Lesson not found")
-            )
-            return
-
-        theory_content = lesson.theory_content  # type: ignore
-        sections = theory_content.get("sections", [])
-
-        if next_section >= len(sections):
+        if not theory_chunks or next_chunk >= len(theory_chunks):
             # Move to examples
             session_context["lesson_step"] = "examples"
             # Save session context
@@ -216,17 +218,16 @@ class LessonHandlersMixin:
             return
 
         # Update session context
-        session_context["theory_section"] = next_section
+        session_context["theory_chunk"] = next_chunk
 
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
 
-        # Show next section
-        section = sections[next_section]
-        total_sections = len(sections)
+        # Show next chunk
+        total_chunks = len(theory_chunks)
 
         keyboard = []
-        if next_section < total_sections - 1:
+        if next_chunk < total_chunks - 1:
             keyboard.append(
                 [InlineKeyboardButton("Next ➡️", callback_data=f"theory_next_{lesson_id}")]
             )
@@ -241,7 +242,7 @@ class LessonHandlersMixin:
         keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data=f"theory_prev_{lesson_id}")])
 
         await update.callback_query.edit_message_text(
-            f"💡 *Theory* ({next_section + 1}/{total_sections})\n\n{section['content']}",
+            f"💡 *Theory* ({next_chunk + 1}/{total_chunks})\n\n{theory_chunks[next_chunk]}",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
@@ -249,7 +250,7 @@ class LessonHandlersMixin:
     async def theory_prev_callback(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        """Handle previous theory section button."""
+        """Handle previous theory chunk button."""
         if not update.effective_user or not update.callback_query:
             return
 
@@ -262,14 +263,14 @@ class LessonHandlersMixin:
 
         # Load session context
         session_context = await self.learning_orchestrator.get_session_context(user_id)
-        # context.user_data.update(session_context)  # Removed: using DB session instead
 
-        # Get current section from session context
-        current_section = session_context.get("theory_section", 0)
-        prev_section = current_section - 1
+        # Get current chunk from session context
+        current_chunk = session_context.get("theory_chunk", 0)
+        theory_chunks = session_context.get("theory_chunks", [])
+        prev_chunk = current_chunk - 1
 
-        # Can't go back from first section
-        if prev_section < 0:
+        # Can't go back from first chunk
+        if prev_chunk < 0:
             # Go back to lesson start
             keyboard = [
                 [InlineKeyboardButton("▶️ Start", callback_data=f"lesson_start_{lesson_id}")],
@@ -289,35 +290,23 @@ class LessonHandlersMixin:
                 )
             return
 
-        lesson = await self.learning_orchestrator.lesson_repo.find_by_id(lesson_id)
-
-        if not lesson:
+        if not theory_chunks or prev_chunk >= len(theory_chunks):
             await update.callback_query.edit_message_text(
-                self.formatter.format_error("Lesson not found")
-            )
-            return
-
-        theory_content = lesson.theory_content  # type: ignore
-        sections = theory_content.get("sections", [])
-
-        if prev_section >= len(sections):
-            await update.callback_query.edit_message_text(
-                self.formatter.format_error("Invalid section")
+                self.formatter.format_error("Invalid chunk")
             )
             return
 
         # Update session context
-        session_context["theory_section"] = prev_section
+        session_context["theory_chunk"] = prev_chunk
 
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
 
-        # Show previous section
-        section = sections[prev_section]
-        total_sections = len(sections)
+        # Show previous chunk
+        total_chunks = len(theory_chunks)
 
         keyboard = []
-        if prev_section < total_sections - 1:
+        if prev_chunk < total_chunks - 1:
             keyboard.append(
                 [InlineKeyboardButton("Next ➡️", callback_data=f"theory_next_{lesson_id}")]
             )
@@ -330,8 +319,8 @@ class LessonHandlersMixin:
                 ]
             )
 
-        # Only show back button if not on first section
-        if prev_section > 0:
+        # Only show back button if not on first chunk
+        if prev_chunk > 0:
             keyboard.append(
                 [InlineKeyboardButton("⬅️ Back", callback_data=f"theory_prev_{lesson_id}")]
             )
@@ -345,7 +334,7 @@ class LessonHandlersMixin:
             )
 
         await update.callback_query.edit_message_text(
-            f"💡 *Theory* ({prev_section + 1}/{total_sections})\n\n{section['content']}",
+            f"💡 *Theory* ({prev_chunk + 1}/{total_chunks})\n\n{theory_chunks[prev_chunk]}",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )

@@ -89,6 +89,7 @@ class TestPracticeEvaluationE2E:
         # Mock progress tracker methods
         bot_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
         bot_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
+        bot_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
 
         # Step 1: Start practice
         await bot_handlers.practice_callback(practice_user_update, practice_user_context)

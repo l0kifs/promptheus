@@ -265,7 +265,6 @@ class PracticeHandlersMixin:
             # Update progress using async progress tracker
             await self.progress_tracker.increment_attempts(user_id, lesson_id)
 
-            # If score is good enough, mark as completed
             # Parse score safely - it should be an int, but handle edge cases
             score_value = feedback.get("score", 0)
             if isinstance(score_value, int):
@@ -275,6 +274,11 @@ class PracticeHandlersMixin:
             else:
                 score = 0
 
+            # ALWAYS record the score, regardless of value (FIX: scores below 7 were not being saved)
+            await self.progress_tracker.record_attempt(user_id, lesson_id, score)
+            logger.info("Score recorded", user_id=user_id, lesson_id=lesson_id, score=score)
+
+            # If score is good enough, ALSO mark as completed
             if score >= 7:
                 await self.progress_tracker.complete_lesson(user_id, lesson_id, score)
                 logger.info(

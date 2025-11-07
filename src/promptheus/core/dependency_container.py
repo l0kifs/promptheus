@@ -6,6 +6,7 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from promptheus.ai.openrouter_client import OpenRouterClient
+from promptheus.ai.prompt_template_manager import PromptTemplateManager
 from promptheus.config import get_settings
 from promptheus.core.assessment_engine import AssessmentEngine
 from promptheus.core.learning_flow_orchestrator import LearningFlowOrchestrator
@@ -64,11 +65,15 @@ class DependencyContainer:
             ai_client = OpenRouterClient()
             self._register_component("ai_client", ai_client)
 
+            # Initialize prompt template manager
+            template_manager = PromptTemplateManager()
+            self._register_component("template_manager", template_manager)
+
             # Initialize repositories (will be created per request with session)
             self._register_component("async_session_maker", self._async_session_maker)
 
             # Initialize core components
-            assessment_engine = AssessmentEngine(ai_client)
+            assessment_engine = AssessmentEngine(ai_client, template_manager)
             self._register_component("assessment_engine", assessment_engine)
 
             logger.info("Dependency container initialized successfully")
@@ -91,24 +96,20 @@ class DependencyContainer:
 
     # Factory methods for components that need database sessions
     async def get_user_repository(self) -> AsyncUserRepository:
-        """Get UserRepository with async session."""
-        session = self._async_session_maker()
-        return AsyncUserRepository(session)
+        """Get UserRepository with async session maker."""
+        return AsyncUserRepository(self._async_session_maker)
 
     async def get_lesson_repository(self) -> AsyncLessonRepository:
-        """Get LessonRepository with async session."""
-        session = self._async_session_maker()
-        return AsyncLessonRepository(session)
+        """Get LessonRepository with async session maker."""
+        return AsyncLessonRepository(self._async_session_maker)
 
     async def get_progress_repository(self) -> AsyncProgressRepository:
-        """Get ProgressRepository with async session."""
-        session = self._async_session_maker()
-        return AsyncProgressRepository(session)
+        """Get ProgressRepository with async session maker."""
+        return AsyncProgressRepository(self._async_session_maker)
 
     async def get_session_repository(self) -> AsyncSessionRepository:
-        """Get SessionRepository with async session."""
-        session = self._async_session_maker()
-        return AsyncSessionRepository(session)
+        """Get SessionRepository with async session maker."""
+        return AsyncSessionRepository(self._async_session_maker)
 
     async def get_learning_flow_orchestrator(self) -> LearningFlowOrchestrator:
         """Get LearningFlowOrchestrator with repositories."""

@@ -136,6 +136,53 @@ class TestOpenRouterClient:
         assert result == "Alternative response"
 
     @pytest.mark.asyncio
+    async def test_call_with_fallback_exponential_backoff_on_primary_failure(
+        self, client, respx_mock, mock_settings, mocker
+    ):
+        """Test exponential backoff when primary model fails."""
+        # Mock primary model failure, secondary success
+        route = respx_mock.post("https://openrouter.ai/api/v1/chat/completions")
+
+        route.side_effect = [
+            httpx.HTTPError("Primary failed"),
+            httpx.Response(200, json={"choices": [{"message": {"content": "Secondary response"}}]}),
+        ]
+
+        # Mock asyncio.sleep to track delays
+        mock_sleep = mocker.patch("asyncio.sleep")
+
+        result = await client.call_with_fallback("Test prompt")
+
+        assert result == "Secondary response"
+        # Should have one delay: 2^0 = 1 second
+        mock_sleep.assert_called_once_with(1)
+
+    @pytest.mark.asyncio
+    async def test_call_with_fallback_all_models_fail_with_backoff(
+        self, client, respx_mock, mock_settings, mocker
+    ):
+        """Test exponential backoff when all models fail."""
+        route = respx_mock.post("https://openrouter.ai/api/v1/chat/completions")
+
+        # All three models fail
+        route.side_effect = [
+            httpx.HTTPError("Primary failed"),
+            httpx.HTTPError("Secondary failed"),
+            httpx.HTTPError("Alternative failed"),
+        ]
+
+        # Mock asyncio.sleep to track delays
+        mock_sleep = mocker.patch("asyncio.sleep")
+
+        with pytest.raises(RuntimeError, match="All AI models failed"):
+            await client.call_with_fallback("Test prompt")
+
+        # Should have two delays: 2^0 = 1s, 2^1 = 2s
+        assert mock_sleep.call_count == 2
+        calls = [call.args[0] for call in mock_sleep.call_args_list]
+        assert calls == [1, 2]
+
+    @pytest.mark.asyncio
     async def test_call_with_fallback_unexpected_error(self, client, respx_mock, mock_settings):
         """Test fallback chain with unexpected error that doesn't trigger continue."""
         # This is a rare edge case where an exception occurs that doesn't match our expected patterns

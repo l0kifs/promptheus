@@ -30,16 +30,9 @@ class ProgressTracker:
         logger.info(
             "Marking lesson as completed", user_id=user_id, lesson_id=lesson_id, score=score
         )
-        progress = await self.progress_repo.find_by_user_and_lesson(user_id, lesson_id)
-        if progress:
-            progress.status = LessonStatus.COMPLETED  # type: ignore
-            progress.last_score = score  # type: ignore
-            progress.completed_at = datetime.now(UTC)  # type: ignore
-            logger.info("Lesson marked as completed", user_id=user_id, lesson_id=lesson_id)
-        else:
-            logger.warning(
-                "Cannot mark completed: progress not found", user_id=user_id, lesson_id=lesson_id
-            )
+        await self.progress_repo.update_status(user_id, lesson_id, LessonStatus.COMPLETED)
+        await self.progress_repo.update_score(user_id, lesson_id, score)
+        logger.info("Lesson marked as completed", user_id=user_id, lesson_id=lesson_id)
 
     async def record_attempt(self, user_id: int, lesson_id: int, score: int) -> None:
         """Record exercise attempt."""
@@ -55,18 +48,12 @@ class ProgressTracker:
     async def complete_lesson(self, user_id: int, lesson_id: int, score: int) -> None:
         """Mark lesson as completed with final score."""
         logger.info("Completing lesson", user_id=user_id, lesson_id=lesson_id, score=score)
-        progress = await self.progress_repo.find_by_user_and_lesson(user_id, lesson_id)
-        if progress:
-            progress.status = LessonStatus.COMPLETED  # type: ignore
-            progress.last_score = score  # type: ignore
-            progress.completed_at = datetime.now(UTC)  # type: ignore
-            logger.info(
-                "Lesson completed successfully", user_id=user_id, lesson_id=lesson_id, score=score
-            )
-        else:
-            logger.warning(
-                "Cannot complete lesson: progress not found", user_id=user_id, lesson_id=lesson_id
-            )
+        await self.progress_repo.update_status(user_id, lesson_id, LessonStatus.COMPLETED)
+        await self.progress_repo.update_score(user_id, lesson_id, score)
+        await self.progress_repo.update_completed_at(user_id, lesson_id, datetime.now(UTC))
+        logger.info(
+            "Lesson completed successfully", user_id=user_id, lesson_id=lesson_id, score=score
+        )
 
     async def get_progress_summary(self, user_id: int) -> dict[str, int | float]:
         """Get progress summary for user."""

@@ -63,7 +63,7 @@ class OpenRouterClient:
             self.settings.ai_model_alternative,
         ]
 
-        for model in models:
+        for attempt, model in enumerate(models):
             try:
                 logger.info(f"Trying model: {model}")
                 result = await self.call_model(prompt, model, max_tokens, temperature)
@@ -71,8 +71,10 @@ class OpenRouterClient:
                 return result
             except Exception as e:
                 logger.warning(f"Model {model} failed: {e}")
-                if model == models[-1]:
-                    raise RuntimeError("All AI models failed") from e
+                if attempt < len(models) - 1:  # Not the last model
+                    delay = 2**attempt  # 1s, 2s, 4s
+                    logger.info(f"Waiting {delay}s before trying next model")
+                    await asyncio.sleep(delay)
                 continue
 
         raise RuntimeError("All AI models failed")

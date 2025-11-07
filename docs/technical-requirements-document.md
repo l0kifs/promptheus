@@ -39,7 +39,7 @@
 - **Theory Modules**: Bite-sized explanations (50-80 words per message, split into multiple messages if needed)
 - **Examples**: Good vs. Bad prompt comparisons with brief annotations (2-3 sentences each)
 - **Exercises**: Scenario-based tasks with clear objectives (max 100 words)
-- **Feedback**: AI-generated evaluation with improvement suggestions (structured in 2-3 short messages)
+- **Feedback**: AI-generated evaluation with improvement suggestions (comprehensive single message with score, strengths, improvements, and example)
 
 ##### 2.3.1 Progress Calculation
 - **Completion Rate**: Count of completed lessons / total attempted lessons
@@ -224,7 +224,7 @@ TEMPERATURE_FEEDBACK=0.5
   - Theory content: 50-80 words/message
   - Example annotations: 2-3 sentences/comparison
   - Exercise descriptions: max 100 words
-  - Feedback: structured 2-3 messages
+  - Feedback: comprehensive single message
 - Rate limiting thresholds
 - Retry attempts and timeouts
 - Session timeout duration (15 minutes inactivity)

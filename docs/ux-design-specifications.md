@@ -18,7 +18,7 @@
 - Theory: 50-80 words per message
 - Examples: 2-3 sentences (150-200 chars)
 - Exercises: Max 100 words
-- Feedback: 2-3 structured messages
+- Feedback: Single comprehensive message
 
 **Typography**:
 ```
@@ -216,34 +216,30 @@ AI подстраивает стиль, лексику и глубину
 ⏳ Анализирую ваш промпт...
 ```
 
-**AI Feedback** (structured)
+**AI Feedback** (single comprehensive message)
 ```
-📝 Ваш промпт:
+📝 *Your Prompt:*
 "Дай совет по питанию для спорта"
 
-🔍 Оценка: 4/10
+🔍 *Score:* 4/10
 
-❌ Что не хватает:
-• Роли специалиста
-• Конкретики (вид спорта, цель)
+❌ *What needs improvement:*
+• Missing specialist role
+• Not specific enough (sport type, goal)
 
-[Посмотреть улучшенный ➡️]
-```
+✅ *Strengths:*
+• Clear request structure
 
-```
-✅ Улучшенная версия:
+💡 *Suggestions for improvement:*
+• Add a specific role (e.g., "sports nutritionist")
+• Include more context about the sport and goals
+• Specify output format
 
-"Ты — спортивный диетолог с 15-летним
-опытом. Составь план питания для
-начинающего бегуна, цель — похудение.
-Укажи калории и время приемов пищи."
+✨ *Improved version example:*
 
-Добавлено:
-• Роль: спортивный диетолог
-• Контекст: начинающий бегун, похудение
-• Формат: план с калориями и временем
+"Ты — спортивный диетолог с 15-летним опытом. Составь план питания для начинающего бегуна, цель — похудение. Укажи калории и время приемов пищи."
 
-[🔄 Попробовать еще]  [✅ Урок завершен]
+[🔄 Try Again]  [✅ Lesson Complete]
 ```
 
 **Lesson Completion**

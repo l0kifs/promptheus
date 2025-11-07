@@ -27,7 +27,7 @@ Based on established prompt engineering principles:
 
 ### Interactive Learning Methods
 - **Concept Explanation**: Theory delivered in conversational, digestible format
-- **Good vs. Bad Examples**: Side-by-side comparisons with analysis
+- **Good vs. Bad Examples**: Sequential comparisons with clear problem analysis and improvement rationale
 - **Practice Exercises**: Real-world scenarios for hands-on learning
 - **AI-Powered Feedback**: Instant evaluation of user-submitted prompts
 - **Iterative Improvement**: Guided refinement of prompts

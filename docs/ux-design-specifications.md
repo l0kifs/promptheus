@@ -183,12 +183,6 @@ AI подстраивает стиль, лексику и глубину
 Проблема: Слишком общо, непонятен
 контекст и глубина ответа.
 
-[Показать хороший ➡️]
-```
-
-```
-📊 Пример: Хороший промпт
-
 ✅ "Ты — Python-разработчик с 10-летним
 опытом. Объясни новичку, что такое
 декораторы, на простом примере."
@@ -574,7 +568,7 @@ progress_view
 - Button label wording
 - Emoji usage density
 - Message chunking (2 vs 3 messages)
-- Example format (side-by-side vs sequential)
+- Example format variations (future testing)
 
 **Performance Targets**:
 - Message send: <500ms

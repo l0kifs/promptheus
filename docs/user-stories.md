@@ -92,8 +92,8 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 **Acceptance Criteria:**
 - Bad example shown first with ❌ marker
 - Problem explained (2-3 sentences)
-- "Show Good ➡️" button displays improved version with ✅
-- Brief annotation of changes (2-3 sentences)
+- Good example shown immediately after with ✅ marker
+- Brief annotation explaining improvements (2-3 sentences)
 - Data taken from lesson's `examples` JSON field
 
 ---

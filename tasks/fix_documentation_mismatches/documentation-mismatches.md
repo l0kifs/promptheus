@@ -319,20 +319,7 @@ await query.edit_message_text(
 
 ---
 
-### 7.2 Examples Format (UXD §3.2)
-
-**Documentation (UXD §3.2)**:
-- Show bad example first with ❌
-- Button "Show Good ➡️"
-- Side-by-side comparison
-
-**Implementation**:
-- ✅ Bad → Good shown sequentially
-- ❌ **Discrepancy**: No side-by-side; only sequential presentation
-
----
-
-### 7.3 Lesson Progress Tracking (TRD §4.3)
+### 7.2 Lesson Progress Tracking (TRD §4.3)
 
 **Documentation (DDD §3.3)**:
 ```

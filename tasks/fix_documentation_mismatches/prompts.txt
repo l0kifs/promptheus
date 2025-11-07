@@ -9,8 +9,8 @@ save it in a new md document fix-issue-X-X-plan.md in the directory `tasks/fix_d
 Read all documents in the root of the `docs` directory.  
 Analyze the document `tasks/fix_documentation_mismatches/documentation-mismatches.md`.  
 Analyze the current state of the project.  
-Create plan to fix issues X.1 - X.N from the document `tasks/fix_documentation_mismatches/documentation-mismatches.md` based on `docs/project_rules/ai-agent-task-template.md` and  
-save it in a new md document fix-issues-X-plan.md in the directory `tasks/fix_documentation_mismatches`.
+Create plan to fix issues 7.1 - 7.2 from the document `tasks/fix_documentation_mismatches/documentation-mismatches.md` based on `docs/project_rules/ai-agent-task-template.md` and  
+save it in a new md document fix-issues-7-plan.md in the directory `tasks/fix_documentation_mismatches`.
 
 
 ========================================================================

@@ -35,7 +35,7 @@
 
 ### 2.2 Content Delivery
 - [ ] **Chunking theory into 50-80 words** (TRD §3.3, UXD §2.1) - content is sent whole
-- [ ] **Side-by-side examples** (UXD §3.2) - shown sequentially instead of side-by-side comparison
+- [ ] **Side-by-side examples** (UXD §3.2) - shown sequentially (accepted as current implementation)
 - [ ] **Annotations for examples** (DDD §3.2) - annotations exist in JSON but are not formatted separately
 - [ ] **Hint system** (US §3.1) - callback registered but function not implemented
 

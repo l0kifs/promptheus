@@ -41,6 +41,14 @@
 - **Exercises**: Scenario-based tasks with clear objectives (max 100 words)
 - **Feedback**: AI-generated evaluation with improvement suggestions (structured in 2-3 short messages)
 
+##### 2.3.1 Progress Calculation
+- **Completion Rate**: Count of completed lessons / total attempted lessons
+- **Average Score**: Sum of all `last_score` values / count of lessons with scores
+  - Includes both `in_progress` and `completed` lessons
+  - Only lessons where user has submitted at least one practice attempt (has `last_score`)
+  - Gives accurate performance metric independent of completion status
+  - Example: User attempts 3 lessons with scores 8, 6, 3 → Average = (8+6+3)/3 = 5.67/10
+
 #### 2.4 AI Integration
 - **Model Selection**: Free models for MVP phase via OpenRouter
   - Primary: `meta-llama/llama-4-scout:free` (109B MoE, 512K context)

@@ -155,6 +155,10 @@
 - `completed_at` set when status changes to `completed`
 - `attempts` incremented on each exercise submission
 - `last_score` updated with AI evaluation result
+- `last_score` is updated whenever user completes a practice exercise, regardless of lesson status
+- Average score calculation includes all progress records where `last_score IS NOT NULL`
+- Lesson `status` (in_progress vs completed) does not affect score averaging
+- Example: User with 3 lessons (scores: 8, 6, 3) shows average of 5.7/10 regardless of completion status
 
 ---
 

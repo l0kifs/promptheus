@@ -149,7 +149,7 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 **Acceptance Criteria:**
 - Current level (`skill_level`) displayed
 - Number of completed lessons shown
-- Average score calculated from `last_score` of all completed lessons
+- Average score calculated from `last_score` of all attempted lessons (both in-progress and completed)
 - Last studied lesson indicated with date
 - "▶️ Continue" and "📋 All Lessons" buttons
 

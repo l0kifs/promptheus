@@ -60,7 +60,7 @@
 - **Learning Flow Orchestrator**: Manages lesson progression, navigation, resume capability
 - **Content Delivery Manager**: Chunks content into mobile-optimized messages (50-80 words)
 - **Assessment Engine**: Evaluates user skill level, generates personalized paths
-- **Progress Tracker**: Records completion, calculates scores, manages checkpoints
+- **Progress Tracker**: Records completion, calculates average scores from all attempted lessons (both in-progress and completed), manages checkpoints
 
 **Key Interactions**:
 - Receives commands from Bot Interface Layer

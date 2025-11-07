@@ -301,6 +301,13 @@ AI подстраивает стиль, лексику и глубину
 [▶️ Продолжить]  [📋 Все уроки]
 ```
 
+**Score Calculation Logic:**
+- Average score reflects all practice attempts across all lessons
+- Includes both in-progress and completed lessons
+- Shows true performance metric independent of completion status
+- Only counts lessons where user has submitted at least one practice attempt
+- Example: User attempts 3 lessons with scores 8, 6, 3 → Average = 5.7/10 (rounded to 1 decimal)
+
 **Resume Capability**
 ```
 👋 С возвращением!

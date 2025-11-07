@@ -3,7 +3,7 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from promptheus.data.models import SkillLevel
+from promptheus.data.models import LessonStatus, SkillLevel
 
 
 class ProgressHandlersMixin:
@@ -148,7 +148,7 @@ class ProgressHandlersMixin:
             for progress in progress_records[-5:]:
                 lesson = await self.learning_orchestrator.lesson_repo.find_by_id(progress.lesson_id)  # type: ignore
                 if lesson:
-                    status_emoji = "✅" if progress.status == "completed" else "📖"  # type: ignore
+                    status_emoji = "✅" if progress.status == LessonStatus.COMPLETED else "📖"  # type: ignore
                     score_text = f" ({progress.last_score}/10)" if progress.last_score else ""  # type: ignore
                     progress_text += f"{status_emoji} {lesson.title}{score_text}\n"
 

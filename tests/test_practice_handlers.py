@@ -33,6 +33,7 @@ class TestPracticeHandlers:
         learning_orchestrator.lesson_repo.find_next_lesson = mocker.AsyncMock()
         assessment_engine.evaluate_user_prompt = mocker.AsyncMock()
         progress_tracker.increment_attempts = mocker.AsyncMock()
+        progress_tracker.record_attempt = mocker.AsyncMock()
         progress_tracker.complete_lesson = mocker.AsyncMock()
 
         return MockPracticeHandlers(
@@ -390,3 +391,201 @@ class TestPracticeHandlers:
         assert "Try Again" in keyboard[0][0].text
         assert keyboard[0][0].callback_data == "practice_1"
         assert "Menu" in keyboard[1][0].text
+
+    # =====================================================================
+    # REGRESSION TESTS FOR SCORE SAVING BUG FIX
+    # Bug: Scores below 7 were not being saved to database
+    # Fix: Added record_attempt() call for ALL scores before completion check
+    # =====================================================================
+
+    @pytest.mark.asyncio
+    async def test_score_saved_for_low_scores(
+        self, mock_handlers, mock_text_update, mock_context, mocker
+    ):
+        """Test that scores below 7 are recorded in database.
+        
+        REGRESSION TEST: Previously, only scores >= 7 were saved because
+        record_attempt() was never called for low scores. This test ensures
+        ALL scores are now saved regardless of value.
+        """
+        # Mock session context
+        session_context = {"lesson_step": "practice", "current_lesson_id": 1}
+        mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
+            return_value=session_context
+        )
+
+        # Mock AI evaluation with low score (below completion threshold)
+        feedback = {"score": 3, "strengths": [], "improvements": ["Be more specific"]}
+        mock_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
+            return_value=feedback
+        )
+
+        # Mock progress tracking
+        mock_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
+        mock_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
+        mock_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
+
+        # Mock message operations
+        mock_text_update.message.reply_text = mocker.AsyncMock()
+        loading_msg = mocker.Mock()
+        loading_msg.edit_text = mocker.AsyncMock()
+        mock_text_update.message.reply_text.return_value = loading_msg
+
+        await mock_handlers.text_message_handler(mock_text_update, mock_context)
+
+        # CRITICAL: Verify record_attempt was called with the low score
+        # This is the fix for the bug - scores must be saved regardless of value
+        mock_handlers.progress_tracker.record_attempt.assert_called_once_with(12345, 1, 3)
+
+        # Verify attempts incremented
+        mock_handlers.progress_tracker.increment_attempts.assert_called_once_with(12345, 1)
+
+        # Verify lesson NOT completed (score < 7)
+        mock_handlers.progress_tracker.complete_lesson.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_score_saved_for_high_scores(
+        self, mock_handlers, mock_text_update, mock_context, mocker
+    ):
+        """Test that scores >= 7 are recorded AND lesson is completed.
+        
+        REGRESSION TEST: Verifies that high scores still trigger both
+        record_attempt() AND complete_lesson() calls.
+        """
+        # Mock session context
+        session_context = {"lesson_step": "practice", "current_lesson_id": 1}
+        mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
+            return_value=session_context
+        )
+
+        # Mock AI evaluation with high score (above completion threshold)
+        feedback = {"score": 9, "strengths": ["Excellent detail"], "improvements": []}
+        mock_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
+            return_value=feedback
+        )
+
+        # Mock progress tracking
+        mock_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
+        mock_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
+        mock_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
+
+        # Mock message operations
+        mock_text_update.message.reply_text = mocker.AsyncMock()
+        loading_msg = mocker.Mock()
+        loading_msg.edit_text = mocker.AsyncMock()
+        mock_text_update.message.reply_text.return_value = loading_msg
+
+        await mock_handlers.text_message_handler(mock_text_update, mock_context)
+
+        # CRITICAL: Verify record_attempt was called FIRST with the score
+        mock_handlers.progress_tracker.record_attempt.assert_called_once_with(12345, 1, 9)
+
+        # Verify attempts incremented
+        mock_handlers.progress_tracker.increment_attempts.assert_called_once_with(12345, 1)
+
+        # Verify lesson completed (score >= 7)
+        mock_handlers.progress_tracker.complete_lesson.assert_called_once_with(12345, 1, 9)
+
+    @pytest.mark.asyncio
+    async def test_score_saved_at_threshold(
+        self, mock_handlers, mock_text_update, mock_context, mocker
+    ):
+        """Test that score exactly at threshold (7) is saved and completes lesson.
+        
+        REGRESSION TEST: Boundary test to ensure score of 7 triggers both
+        record_attempt() and complete_lesson().
+        """
+        # Mock session context
+        session_context = {"lesson_step": "practice", "current_lesson_id": 1}
+        mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
+            return_value=session_context
+        )
+
+        # Mock AI evaluation with threshold score
+        feedback = {"score": 7, "strengths": ["Good effort"], "improvements": ["Minor tweaks"]}
+        mock_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
+            return_value=feedback
+        )
+
+        # Mock progress tracking
+        mock_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
+        mock_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
+        mock_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
+
+        # Mock message operations
+        mock_text_update.message.reply_text = mocker.AsyncMock()
+        loading_msg = mocker.Mock()
+        loading_msg.edit_text = mocker.AsyncMock()
+        mock_text_update.message.reply_text.return_value = loading_msg
+
+        await mock_handlers.text_message_handler(mock_text_update, mock_context)
+
+        # Verify record_attempt called with threshold score
+        mock_handlers.progress_tracker.record_attempt.assert_called_once_with(12345, 1, 7)
+
+        # Verify attempts incremented
+        mock_handlers.progress_tracker.increment_attempts.assert_called_once_with(12345, 1)
+
+        # Verify lesson completed (score == 7)
+        mock_handlers.progress_tracker.complete_lesson.assert_called_once_with(12345, 1, 7)
+
+    @pytest.mark.asyncio
+    async def test_multiple_attempts_update_score(
+        self, mock_handlers, mock_text_update, mock_context, mocker
+    ):
+        """Test that multiple attempts with different scores all get recorded.
+        
+        REGRESSION TEST: Simulates user making multiple attempts with varying
+        scores (2, 6, 8) to ensure all are saved. This matches the real bug
+        scenario where user had scores 2 and 8 but average showed 8.0.
+        """
+        # Mock session context
+        session_context = {"lesson_step": "practice", "current_lesson_id": 1}
+        mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
+            return_value=session_context
+        )
+
+        # Mock progress tracking
+        mock_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
+        mock_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
+        mock_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
+
+        # Mock message operations
+        mock_text_update.message.reply_text = mocker.AsyncMock()
+        loading_msg = mocker.Mock()
+        loading_msg.edit_text = mocker.AsyncMock()
+        mock_text_update.message.reply_text.return_value = loading_msg
+
+        # Simulate three attempts with different scores: 2, 6, 8
+        scores = [2, 6, 8]
+        for score in scores:
+            # Mock AI evaluation for each attempt
+            feedback = {
+                "score": score,
+                "strengths": [] if score < 7 else ["Good work"],
+                "improvements": ["Improve"] if score < 7 else [],
+            }
+            mock_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
+                return_value=feedback
+            )
+
+            # Reset mocks for each attempt
+            mock_handlers.progress_tracker.record_attempt.reset_mock()
+            mock_handlers.progress_tracker.increment_attempts.reset_mock()
+            mock_handlers.progress_tracker.complete_lesson.reset_mock()
+
+            await mock_handlers.text_message_handler(mock_text_update, mock_context)
+
+            # CRITICAL: Verify record_attempt was called for EVERY score
+            mock_handlers.progress_tracker.record_attempt.assert_called_once_with(12345, 1, score)
+
+            # Verify attempts incremented
+            mock_handlers.progress_tracker.increment_attempts.assert_called_once_with(12345, 1)
+
+            # Verify complete_lesson only called when score >= 7
+            if score >= 7:
+                mock_handlers.progress_tracker.complete_lesson.assert_called_once_with(
+                    12345, 1, score
+                )
+            else:
+                mock_handlers.progress_tracker.complete_lesson.assert_not_called()

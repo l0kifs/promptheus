@@ -48,7 +48,7 @@ class TestSettingsValidation:
         assert settings.temperature_default == 0.7
         assert settings.database_url == "sqlite:///./data/promptheus.db"
         assert settings.environment == "development"
-        assert settings.log_level == "INFO"
+        assert settings.log_level == "DEBUG"
         assert settings.rate_limit_requests == 10
         assert settings.session_timeout_minutes == 15
 

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,7 +56,12 @@ class Settings(BaseSettings):
         default="development",
         description="Application environment",
     )
-    log_level: str = Field(default="INFO", description="Logging level")
+
+    @computed_field
+    @property
+    def log_level(self) -> str:
+        """Compute log level based on environment."""
+        return "DEBUG" if self.environment == "development" else "WARNING"
 
     # Rate limiting
     rate_limit_requests: int = Field(default=10, description="Requests per minute per user")

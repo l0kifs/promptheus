@@ -64,9 +64,9 @@ def configure_logging() -> None:
         "logs/promptheus_{time:YYYY-MM-DD}.log",
         rotation="00:00",  # Rotate at midnight
         retention="30 days",
-        level="DEBUG",
+        level=settings.log_level,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        serialize=False,
+        serialize=True,
     )
 
     logger.info("Logging configured", log_level=settings.log_level)

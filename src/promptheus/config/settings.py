@@ -116,32 +116,52 @@ class Settings(BaseSettings):
     @classmethod
     def validate_webhook_url(cls, v: str | None) -> str | None:
         """Validate that webhook URL uses HTTPS protocol."""
+        from promptheus.core.exceptions import ConfigurationError
+
         if v is not None and not v.startswith("https://"):
-            raise ValueError("webhook_url must use HTTPS protocol")
+            raise ConfigurationError(
+                f"Invalid webhook URL: must use HTTPS protocol, got '{v}'",
+                details={"field": "webhook_url", "value": v, "required_protocol": "https"},
+            )
         return v
 
     @field_validator("webhook_port")
     @classmethod
     def validate_webhook_port(cls, v: int) -> int:
         """Validate that webhook port is one of the allowed values."""
+        from promptheus.core.exceptions import ConfigurationError
+
         allowed_ports = [80, 88, 443, 8443]
         if v not in allowed_ports:
-            raise ValueError(f"webhook_port must be one of {allowed_ports}")
+            raise ConfigurationError(
+                f"Invalid webhook port: must be one of {allowed_ports}, got {v}",
+                details={"field": "webhook_port", "value": v, "allowed_ports": allowed_ports},
+            )
         return v
 
     @field_validator("api_server_port")
     @classmethod
     def validate_api_server_port(cls, v: int) -> int:
         """Validate that API server port doesn't conflict with webhook port."""
+        from promptheus.core.exceptions import ConfigurationError
+
         if v < 1 or v > 65535:
-            raise ValueError("api_server_port must be between 1 and 65535")
+            raise ConfigurationError(
+                f"Invalid API server port: must be between 1 and 65535, got {v}",
+                details={"field": "api_server_port", "value": v, "valid_range": "1-65535"},
+            )
         return v
 
     @model_validator(mode="after")
     def validate_webhook_mode_requirements(self) -> "Settings":
         """Validate that webhook mode has required configuration."""
+        from promptheus.core.exceptions import ConfigurationError
+
         if self.bot_mode == "webhook" and not self.webhook_url:
-            raise ValueError("webhook_url is required when bot_mode is 'webhook'")
+            raise ConfigurationError(
+                "Webhook mode requires webhook_url to be configured",
+                details={"bot_mode": self.bot_mode, "webhook_url": self.webhook_url},
+            )
         return self
 
 

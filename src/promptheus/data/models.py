@@ -18,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from promptheus.core.exceptions import ValidationError
 from promptheus.data.database import Base
 
 
@@ -86,6 +87,34 @@ class User(Base):
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
     session = relationship("UserSession", back_populates="user", uselist=False)
 
+    @staticmethod
+    def validate_skill_level_value(skill_level: str) -> None:
+        """Validate that skill level string is a valid enum value."""
+        try:
+            SkillLevel(skill_level)
+        except ValueError as e:
+            raise ValidationError(
+                f"Invalid skill level: {skill_level}. Must be one of {[e.value for e in SkillLevel]}",
+                details={
+                    "field": "skill_level",
+                    "value": skill_level,
+                    "valid_values": [e.value for e in SkillLevel],
+                },
+            ) from e
+
+    @staticmethod
+    def validate_assessment_score_value(assessment_score: int | None) -> None:
+        """Validate that assessment score is within valid range."""
+        if assessment_score is not None and (assessment_score < 0 or assessment_score > 100):
+            raise ValidationError(
+                f"Invalid assessment score: {assessment_score}. Must be between 0 and 100",
+                details={
+                    "field": "assessment_score",
+                    "value": assessment_score,
+                    "valid_range": "0-100",
+                },
+            )
+
 
 class Lesson(Base):
     """Lesson model."""
@@ -136,6 +165,15 @@ class UserProgress(Base):
     # Relationships
     user = relationship("User", back_populates="progress")
     lesson = relationship("Lesson", back_populates="progress")
+
+    @staticmethod
+    def validate_last_score_value(last_score: int | None) -> None:
+        """Validate that last score is within valid range."""
+        if last_score is not None and (last_score < 0 or last_score > 100):
+            raise ValidationError(
+                f"Invalid last score: {last_score}. Must be between 0 and 100",
+                details={"field": "last_score", "value": last_score, "valid_range": "0-100"},
+            )
 
 
 class UserSession(Base):

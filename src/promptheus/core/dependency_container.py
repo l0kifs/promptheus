@@ -9,6 +9,7 @@ from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.ai.prompt_template_manager import PromptTemplateManager
 from promptheus.config import get_settings
 from promptheus.core.assessment_engine import AssessmentEngine
+from promptheus.core.exceptions import SystemError
 from promptheus.core.learning_flow_orchestrator import LearningFlowOrchestrator
 from promptheus.core.progress_tracker import ProgressTracker
 from promptheus.core.rate_limit_service import RateLimitService
@@ -96,7 +97,13 @@ class DependencyContainer:
     def get_component(self, name: str) -> Any:
         """Get a component from the container."""
         if name not in self._components:
-            raise ValueError(f"Component '{name}' not found in container")
+            raise SystemError(
+                f"Component '{name}' not found in container",
+                details={
+                    "component_name": name,
+                    "available_components": list(self._components.keys()),
+                },
+            )
         return self._components[name]
 
     # Factory methods for components that need database sessions

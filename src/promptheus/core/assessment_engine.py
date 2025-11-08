@@ -7,6 +7,7 @@ from loguru import logger
 from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.ai.prompt_template_manager import PromptTemplateManager
 from promptheus.config import get_settings
+from promptheus.core.exceptions import AssessmentError
 from promptheus.data.models import SkillLevel
 
 
@@ -90,7 +91,7 @@ class AssessmentEngine:
             - areas_for_improvement: List of improvement suggestions
 
         Raises:
-            ValueError: If assessment questions count is not exactly 5
+            AssessmentError: If assessment questions count is not exactly 5
 
         Note:
             Falls back to basic answer counting if AI evaluation fails.
@@ -102,7 +103,10 @@ class AssessmentEngine:
         # Validate question count (must be exactly 5 as per US §1.2)
         if len(questions) != 5:
             logger.error("Assessment questions count mismatch", expected=5, actual=len(questions))
-            raise ValueError(f"Assessment must have exactly 5 questions, found {len(questions)}")
+            raise AssessmentError(
+                f"Invalid assessment configuration: expected 5 questions, got {len(questions)}",
+                details={"expected": 5, "actual": len(questions)},
+            )
 
         # Prepare questions and answers for AI analysis
         questions_and_answers = self._format_questions_and_answers(questions, answers)

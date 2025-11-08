@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.bot.message_formatter import MessageFormatter
 from promptheus.core.assessment_engine import AssessmentEngine
+from promptheus.core.exceptions import BusinessError, SystemError, ValidationError
 from promptheus.core.learning_flow_orchestrator import LearningFlowOrchestrator
 from promptheus.core.progress_tracker import ProgressTracker
 from promptheus.core.rate_limit_service import RateLimitService
@@ -86,11 +87,15 @@ class BaseBotHandlers:
         if isinstance(error, (NetworkError, TimedOut, httpx.TimeoutException, httpx.ConnectError)):
             return "api_error"
 
-        # User input validation errors
-        elif isinstance(error, (ValueError, KeyError, TypeError)):
+        # User input validation errors and business logic errors
+        elif isinstance(error, (ValueError, KeyError, TypeError, ValidationError, BusinessError)):
             return "user_error"
 
         # System/internal errors
+        elif isinstance(error, SystemError):
+            return "system_error"
+
+        # Default fallback
         else:
             return "system_error"
 

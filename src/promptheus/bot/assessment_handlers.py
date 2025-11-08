@@ -2,6 +2,7 @@
 
 from loguru import logger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from promptheus.data.models import LearningGoal, SkillLevel
@@ -132,6 +133,15 @@ class AssessmentHandlersMixin:
         session_context = await self.learning_orchestrator.get_session_context(user_id)
         # context.user_data.update(session_context)  # Removed: using DB session instead
 
+        # Show loading message while evaluating
+        loading_msg = await update.callback_query.message.reply_text(
+            self.formatter.get_typing_indicator_message("evaluating"),
+            parse_mode="Markdown",
+        )
+
+        # Send typing indicator during AI processing
+        await update.callback_query.message.chat.send_action(ChatAction.TYPING)
+
         # Calculate results
         assessment_engine = self.assessment_engine
         answers = session_context.get("assessment_answers", [])
@@ -151,7 +161,7 @@ class AssessmentHandlersMixin:
         ]
 
         try:
-            await update.callback_query.edit_message_text(
+            await loading_msg.edit_text(
                 self.formatter.format_goal_selection(),
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown",

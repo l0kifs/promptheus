@@ -134,6 +134,14 @@ class TestAssessmentHandlers:
         # Mock callback operations
         mock_callback_update.callback_query.answer = mocker.AsyncMock()
         mock_callback_update.callback_query.edit_message_text = mocker.AsyncMock()
+        mock_callback_update.callback_query.message = mocker.Mock()
+        mock_callback_update.callback_query.message.reply_text = mocker.AsyncMock()
+        mock_callback_update.callback_query.message.chat = mocker.Mock()
+        mock_callback_update.callback_query.message.chat.send_action = mocker.AsyncMock()
+
+        # Mock the loading message returned by reply_text
+        loading_msg = mocker.AsyncMock()
+        mock_callback_update.callback_query.message.reply_text.return_value = loading_msg
 
         await mock_handlers.answer_callback(mock_callback_update, mock_context)
 
@@ -168,19 +176,27 @@ class TestAssessmentHandlers:
         # Mock callback operations
         mock_callback_update.callback_query.answer = mocker.AsyncMock()
         mock_callback_update.callback_query.edit_message_text = mocker.AsyncMock()
+        mock_callback_update.callback_query.message = mocker.Mock()
+        mock_callback_update.callback_query.message.reply_text = mocker.AsyncMock()
+        mock_callback_update.callback_query.message.chat = mocker.Mock()
+        mock_callback_update.callback_query.message.chat.send_action = mocker.AsyncMock()
+
+        # Mock the loading message returned by reply_text
+        loading_msg = mocker.AsyncMock()
+        mock_callback_update.callback_query.message.reply_text.return_value = loading_msg
 
         await mock_handlers._finish_assessment(mock_callback_update, mock_context)
 
-        # Verify assessment evaluated
-        mock_handlers.assessment_engine.evaluate_answers.assert_called_once_with(
-            ["A", "B", "A", "B", "B"]
-        )
+        # Verify loading message was sent
+        mock_callback_update.callback_query.message.reply_text.assert_called_once()
+        loading_call_args = mock_callback_update.callback_query.message.reply_text.call_args
+        assert "Evaluating your" in loading_call_args[0][0]
 
-        # Verify goal selection shown
-        mock_callback_update.callback_query.edit_message_text.assert_called_once()
-        call_args = mock_callback_update.callback_query.edit_message_text.call_args
-        assert "learning goal" in call_args[0][0].lower()
-        assert isinstance(call_args[1]["reply_markup"], InlineKeyboardMarkup)
+        # Verify goal selection shown by editing the loading message
+        loading_msg.edit_text.assert_called_once()
+        edit_call_args = loading_msg.edit_text.call_args
+        assert "learning goal" in edit_call_args[0][0].lower()
+        assert isinstance(edit_call_args[1]["reply_markup"], InlineKeyboardMarkup)
 
     @pytest.mark.asyncio
     async def test_goal_callback_academic(

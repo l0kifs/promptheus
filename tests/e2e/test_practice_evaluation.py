@@ -107,6 +107,8 @@ class TestPracticeEvaluationE2E:
         prompt_update.message = mocker.Mock()
         prompt_update.message.text = "Create a Python function that reads a CSV file and calculates statistics for numerical columns"
         prompt_update.message.reply_text = mocker.AsyncMock()
+        prompt_update.message.chat = mocker.Mock()
+        prompt_update.message.chat.send_action = mocker.AsyncMock()
 
         # Mock the loading message returned by reply_text
         loading_msg = mocker.AsyncMock()
@@ -266,6 +268,8 @@ class TestPracticeEvaluationE2E:
         prompt_update.message = mocker.Mock()
         prompt_update.message.text = "Test prompt"
         prompt_update.message.reply_text = mocker.AsyncMock()
+        prompt_update.message.chat = mocker.Mock()
+        prompt_update.message.chat.send_action = mocker.AsyncMock()
 
         # Mock the loading message returned by reply_text
         loading_msg = mocker.AsyncMock()

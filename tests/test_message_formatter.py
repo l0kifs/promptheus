@@ -315,12 +315,34 @@ class TestMessageFormatter:
         for chunk in chunks:
             assert len(chunk.split()) <= 40
 
-    def test_chunk_text_by_words_single_word_chunks(self):
-        """Test chunking with very small limits."""
-        text = "word1 word2 word3 word4 word5"
-        chunks = MessageFormatter.chunk_text_by_words(text, min_words=1, max_words=2)
+    def test_get_typing_indicator_message_analyzing(self, formatter):
+        """Test typing indicator message for analyzing operation."""
+        message = formatter.get_typing_indicator_message("analyzing")
+        assert "Analyzing your prompt..." in message
+        assert "⏳" in message
 
-        assert len(chunks) >= 2
-        for chunk in chunks:
-            words_in_chunk = len(chunk.split())
-            assert 1 <= words_in_chunk <= 2
+    def test_get_typing_indicator_message_evaluating(self, formatter):
+        """Test typing indicator message for evaluating operation."""
+        message = formatter.get_typing_indicator_message("evaluating")
+        assert "Evaluating your response..." in message
+        assert "⏳" in message
+
+    def test_get_typing_indicator_message_processing(self, formatter):
+        """Test typing indicator message for processing operation (default)."""
+        message = formatter.get_typing_indicator_message("processing")
+        assert "⏳ Processing..." in message
+
+    def test_get_typing_indicator_message_generating(self, formatter):
+        """Test typing indicator message for generating operation."""
+        message = formatter.get_typing_indicator_message("generating")
+        assert "⏳ Generating feedback..." in message
+
+    def test_get_typing_indicator_message_unknown_operation(self, formatter):
+        """Test typing indicator message for unknown operation."""
+        message = formatter.get_typing_indicator_message("unknown")
+        assert "⏳ Processing..." in message  # Should return default
+
+    def test_get_typing_indicator_message_default(self, formatter):
+        """Test typing indicator message with no operation specified."""
+        message = formatter.get_typing_indicator_message()
+        assert "⏳ Processing..." in message

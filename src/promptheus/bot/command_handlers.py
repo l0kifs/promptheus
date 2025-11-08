@@ -38,11 +38,21 @@ class CommandHandlersMixin:
 
                 if lesson:
                     resume_text = f"👋 Welcome back!\n\nYou were learning:\n**{lesson.title}**\n\n"
-                    resume_text += f"Current step: {lesson_step.title()}"
 
+                    # Show detailed section information
                     if lesson_step == "theory":
                         theory_chunk = session_context.get("theory_chunk", 0)
-                        resume_text += f" (Chunk {theory_chunk + 1})"
+                        total_chunks = len(session_context.get("theory_chunks", []))
+                        if total_chunks > 0:
+                            resume_text += f"📖 Current section: Theory (Part {theory_chunk + 1} of {total_chunks})"
+                        else:
+                            resume_text += "📖 Current section: Theory"
+                    elif lesson_step == "examples":
+                        resume_text += "📊 Current section: Examples"
+                    elif lesson_step == "practice":
+                        resume_text += "✏️ Current section: Practice Exercise"
+                    else:
+                        resume_text += f"Current step: {lesson_step.title()}"
 
                     keyboard = [
                         [InlineKeyboardButton("▶️ Continue", callback_data="continue")],

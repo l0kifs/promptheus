@@ -2,6 +2,7 @@
 
 from loguru import logger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 
@@ -56,7 +57,7 @@ class PracticeHandlersMixin:
         keyboard = [
             [InlineKeyboardButton("💡 Show Hint", callback_data=f"hint_{lesson_id}")],
             [InlineKeyboardButton("⏭️ Skip Exercise", callback_data=f"skip_{lesson_id}")],
-            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
+            [InlineKeyboardButton("⬅️ Back to Examples", callback_data=f"examples_{lesson_id}")],
         ]
 
         practice_text = "✏️ *Practice Exercise*\n\n"
@@ -250,6 +251,9 @@ class PracticeHandlersMixin:
             parse_mode="Markdown",
         )
 
+        # Send typing indicator during AI processing
+        await update.message.chat.send_action(ChatAction.TYPING)
+
         try:
             # Get AI feedback
             assessment_engine = self.assessment_engine
@@ -319,7 +323,9 @@ class PracticeHandlersMixin:
                 keyboard.append(
                     [InlineKeyboardButton("🔄 Try Again", callback_data=f"practice_{lesson_id}")]
                 )
-            keyboard.append([InlineKeyboardButton("📚 Back to Menu", callback_data="menu")])
+            keyboard.append(
+                [InlineKeyboardButton("⬅️ Back to Examples", callback_data=f"examples_{lesson_id}")]
+            )
 
             # Edit loading message with feedback
             await loading_msg.edit_text(

@@ -383,7 +383,7 @@ class LessonHandlersMixin:
 
         keyboard = [
             [InlineKeyboardButton("Continue to Practice ➡️", callback_data=f"practice_{lesson_id}")],
-            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
+            [InlineKeyboardButton("⬅️ Back to Theory", callback_data=f"theory_prev_{lesson_id}")],
         ]
 
         example_text = "📊 *Examples*\n\n"

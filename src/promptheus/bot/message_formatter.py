@@ -163,6 +163,24 @@ Average score: {avg_score}/10"""
         return "⏳ *Processing...*"
 
     @staticmethod
+    def get_typing_indicator_message(operation: str = "processing") -> str:
+        """Get appropriate loading message for different operations.
+
+        Args:
+            operation: The type of operation being performed
+
+        Returns:
+            Formatted loading message
+        """
+        messages = {
+            "analyzing": "⏳ Analyzing your prompt...",
+            "evaluating": "⏳ Evaluating your response...",
+            "processing": "⏳ Processing...",
+            "generating": "⏳ Generating feedback...",
+        }
+        return messages.get(operation, "⏳ Processing...")
+
+    @staticmethod
     def chunk_text_by_words(text: str, min_words: int = 50, max_words: int = 80) -> list[str]:
         """Split text into chunks of specified word count.
 

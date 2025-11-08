@@ -231,6 +231,8 @@ class TestLessonFlowE2E:
         prompt_update.effective_user = existing_user_update.effective_user
         prompt_update.message = mocker.Mock()
         prompt_update.message.text = "Write a Python function to calculate fibonacci numbers"
+        prompt_update.message.chat = mocker.Mock()
+        prompt_update.message.chat.send_action = mocker.AsyncMock()
         analyzing_msg = mocker.AsyncMock()
         analyzing_msg.edit_text = mocker.AsyncMock()
         analyzing_msg.delete = mocker.AsyncMock()

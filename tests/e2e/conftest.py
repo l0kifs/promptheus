@@ -51,6 +51,7 @@ async def dependency_container(mocker):
     mock_assessment_engine = mocker.Mock()
     mock_learning_orchestrator = mocker.Mock()
     mock_progress_tracker = mocker.Mock()
+    mock_rate_limit_service = mocker.Mock()
 
     # Mock database components
     mock_session_maker = mocker.Mock()
@@ -80,6 +81,7 @@ async def dependency_container(mocker):
         assessment_engine=mock_assessment_engine,
         learning_orchestrator=mock_learning_orchestrator,
         progress_tracker=mock_progress_tracker,
+        rate_limit_service=mock_rate_limit_service,
     )
     container.get_bot_handlers = AsyncMock(return_value=mock_bot_handlers)
 

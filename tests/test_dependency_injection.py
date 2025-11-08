@@ -167,6 +167,8 @@ class TestDependencyContainer:
         container._async_session_maker = mock_session_maker
         container._register_component("ai_client", mock_ai_client)
         container._register_component("assessment_engine", mock_assessment_engine)
+        mock_rate_limit_service = MagicMock()
+        container._register_component("rate_limit_service", mock_rate_limit_service)
 
         mock_session = AsyncMock()
         mock_session_maker.return_value = mock_session
@@ -185,6 +187,7 @@ class TestDependencyContainer:
             assert call_args[1]["assessment_engine"] is mock_assessment_engine
             assert isinstance(call_args[1]["learning_orchestrator"], LearningFlowOrchestrator)
             assert isinstance(call_args[1]["progress_tracker"], ProgressTracker)
+            assert call_args[1]["rate_limit_service"] is mock_rate_limit_service
 
     @pytest.mark.asyncio
     async def test_cleanup(self, container):

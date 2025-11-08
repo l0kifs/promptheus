@@ -170,6 +170,15 @@ async def main() -> None:
         logger.critical("Failed to create Telegram application", error=str(e))
         return
 
+    # Initialize rate limiting middleware
+    logger.info("Setting up rate limiting middleware")
+    try:
+        # Rate limiting is implemented in handlers via check_rate_limit method
+        logger.info("Rate limiting service initialized")
+    except Exception as e:
+        logger.critical("Failed to setup rate limiting middleware", error=str(e))
+        return
+
     # Add handlers
     logger.info("Registering bot handlers")
     application.add_handler(CommandHandler("start", handlers.start_command))

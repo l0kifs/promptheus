@@ -23,6 +23,7 @@ class TestProgressHandlers:
         assessment_engine = mocker.Mock()
         learning_orchestrator = mocker.Mock()
         progress_tracker = mocker.Mock()
+        rate_limit_service = mocker.Mock()
 
         # Mock async methods
         learning_orchestrator.get_session_context = mocker.AsyncMock()
@@ -41,6 +42,7 @@ class TestProgressHandlers:
             assessment_engine=assessment_engine,
             learning_orchestrator=learning_orchestrator,
             progress_tracker=progress_tracker,
+            rate_limit_service=rate_limit_service,
         )
 
     @pytest.fixture

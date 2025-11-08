@@ -11,6 +11,7 @@ from promptheus.config import get_settings
 from promptheus.core.assessment_engine import AssessmentEngine
 from promptheus.core.learning_flow_orchestrator import LearningFlowOrchestrator
 from promptheus.core.progress_tracker import ProgressTracker
+from promptheus.core.rate_limit_service import RateLimitService
 from promptheus.data.async_repositories import (
     AsyncLessonRepository,
     AsyncProgressRepository,
@@ -76,6 +77,10 @@ class DependencyContainer:
             assessment_engine = AssessmentEngine(ai_client, template_manager)
             self._register_component("assessment_engine", assessment_engine)
 
+            # Initialize rate limit service
+            rate_limit_service = RateLimitService()
+            self._register_component("rate_limit_service", rate_limit_service)
+
             logger.info("Dependency container initialized successfully")
             self._initialized = True
 
@@ -123,6 +128,10 @@ class DependencyContainer:
         progress_repo = await self.get_progress_repository()
         return ProgressTracker(progress_repo)
 
+    def get_rate_limit_service(self) -> RateLimitService:
+        """Get RateLimitService."""
+        return self.get_component("rate_limit_service")
+
     async def get_bot_handlers(self) -> "BotHandlers":  # type: ignore
         """Get BotHandlers with all dependencies."""
         # Import here to avoid circular imports
@@ -132,12 +141,14 @@ class DependencyContainer:
         assessment_engine = self.get_component("assessment_engine")
         learning_orchestrator = await self.get_learning_flow_orchestrator()
         progress_tracker = await self.get_progress_tracker()
+        rate_limit_service = self.get_rate_limit_service()
 
         return BotHandlers(
             ai_client=ai_client,
             assessment_engine=assessment_engine,
             learning_orchestrator=learning_orchestrator,
             progress_tracker=progress_tracker,
+            rate_limit_service=rate_limit_service,
         )
 
     async def cleanup(self) -> None:

@@ -91,6 +91,65 @@ uv run python -m promptheus.main
 
 The bot will start and log: `Bot is running. Press Ctrl+C to stop.`
 
+### Docker Setup (Alternative)
+
+For containerized deployment:
+
+#### Prerequisites
+- Docker and Docker Compose installed
+- Same environment variables as above
+
+#### Quick Start with Docker
+
+```bash
+# Clone repositories
+git clone https://github.com/l0kifs/promptheus.git
+cd promptheus
+git clone https://github.com/l0kifs/promptheus-content.git ../promptheus-content
+
+# Create environment file
+cp .env.example .env
+# Edit .env with your credentials
+
+# Start with Docker Compose (development)
+docker compose up --build
+
+# Or for production
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+#### Docker Commands
+
+```bash
+# Development setup
+docker compose up --build          # Start all services
+docker compose up -d --build       # Start in background
+docker compose logs -f             # Follow logs
+docker compose down                # Stop and remove containers
+
+# Production setup
+docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml down
+
+# Health check
+curl http://localhost:8080/health
+
+# Database operations
+docker compose exec promptheus uv run alembic upgrade head
+docker compose exec promptheus uv run python ../promptheus-content/scripts/seed_lessons.py
+```
+
+#### Docker Environment Variables
+
+Additional variables for Docker:
+
+| Variable             | Description                    | Default   |
+| -------------------- | ------------------------------ | --------- |
+| `API_SERVER_ENABLED` | Enable health check API server | `true`    |
+| `API_SERVER_HOST`    | API server host                | `0.0.0.0` |
+| `API_SERVER_PORT`    | API server port                | `8080`    |
+
 ### 8. VS Code Workspace (Optional)
 
 For convenient multi-repo development:
@@ -217,6 +276,9 @@ All configuration is done via environment variables in `.env`:
 | `WEBHOOK_SECRET`     | Webhook secret token                    | None                             |
 | `WEBHOOK_PORT`       | Webhook server port                     | 8443                             |
 | `WEBHOOK_PATH`       | Webhook endpoint path                   | `/webhook`                       |
+| `API_SERVER_ENABLED` | Enable health check API server          | `true`                           |
+| `API_SERVER_HOST`    | API server host                         | `0.0.0.0`                        |
+| `API_SERVER_PORT`    | API server port                         | `8080`                           |
 
 See `.env.example` for all available options.
 

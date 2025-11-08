@@ -2,6 +2,8 @@ import asyncio
 import contextlib
 import sys
 
+import uvicorn
+from fastapi import FastAPI
 from loguru import logger
 from telegram import Update
 from telegram.ext import (
@@ -12,6 +14,7 @@ from telegram.ext import (
     filters,
 )
 
+from promptheus.api.health import router as health_router
 from promptheus.config import get_settings
 from promptheus.config.settings import Settings
 from promptheus.core.dependency_container import DependencyContainer
@@ -42,6 +45,43 @@ async def session_cleanup_worker(container: DependencyContainer) -> None:
         except Exception as e:
             logger.error("Error in session cleanup worker", error=str(e))
             # Continue running despite errors
+
+
+async def start_api_server(settings: Settings) -> None:
+    """Start FastAPI server for health checks and future API endpoints."""
+    if not settings.api_server_enabled:
+        logger.info("API server disabled, skipping startup")
+        return
+
+    logger.info("Starting API server", host=settings.api_server_host, port=settings.api_server_port)
+
+    # Create FastAPI app
+    app = FastAPI(
+        title="Promptheus API",
+        description="API server for Promptheus bot health checks and management endpoints",
+        version="0.1.0",
+    )
+
+    # Include routers
+    app.include_router(health_router)
+
+    # Configure uvicorn server
+    config = uvicorn.Config(
+        app=app,
+        host=settings.api_server_host,
+        port=settings.api_server_port,
+        log_level=settings.log_level.lower(),
+    )
+    server = uvicorn.Server(config)
+
+    try:
+        await server.serve()
+    except asyncio.CancelledError:
+        logger.info("API server cancelled")
+        await server.shutdown()
+    except Exception as e:
+        logger.error("Error in API server", error=str(e))
+        raise
 
 
 def configure_logging() -> None:
@@ -233,20 +273,25 @@ async def main() -> None:
     cleanup_task = asyncio.create_task(session_cleanup_worker(container))
     logger.info("Background cleanup task started")
 
-    # Start bot
-    logger.info("Starting bot...")
+    # Start API server and bot concurrently
+    logger.info("Starting API server and bot...")
     try:
         await application.initialize()
         await application.start()
 
-        # Choose bot mode based on settings
-        if settings.bot_mode == "webhook":
-            await start_bot_webhook(application, settings)
-        else:
-            await start_bot_polling(application, settings)
+        # Create tasks for API server and bot
+        api_task = asyncio.create_task(start_api_server(settings))
+        bot_task = asyncio.create_task(
+            start_bot_webhook(application, settings)
+            if settings.bot_mode == "webhook"
+            else start_bot_polling(application, settings)
+        )
+
+        # Run both concurrently
+        await asyncio.gather(api_task, bot_task, return_exceptions=True)
 
     except Exception as e:
-        logger.critical("Failed to start bot", error=str(e))
+        logger.critical("Failed to start services", error=str(e))
         return
 
     # Keep running
@@ -255,7 +300,7 @@ async def main() -> None:
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:
-        logger.info("Received shutdown signal, stopping bot...")
+        logger.info("Received shutdown signal, stopping services...")
         try:
             # Cancel background tasks
             cleanup_task.cancel()
@@ -275,7 +320,7 @@ async def main() -> None:
             # Cleanup database connections
             await container.cleanup()
 
-            logger.info("Bot stopped gracefully")
+            logger.info("Services stopped gracefully")
         except Exception as e:
             logger.error("Error during shutdown", error=str(e))
 

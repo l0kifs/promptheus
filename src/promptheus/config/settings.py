@@ -94,6 +94,24 @@ class Settings(BaseSettings):
         description="Path for webhook endpoint",
     )
 
+    # API Server (for health checks and future admin/user endpoints)
+    api_server_enabled: bool = Field(
+        default=True,
+        description="Enable API server for health checks and future endpoints",
+    )
+    api_server_host: str = Field(
+        default="0.0.0.0",
+        description="Host for API server",
+    )
+    api_server_port: int = Field(
+        default=8080,
+        description="Port for API server",
+    )
+    health_check_timeout_seconds: int = Field(
+        default=5,
+        description="Timeout for health check operations in seconds",
+    )
+
     @field_validator("webhook_url")
     @classmethod
     def validate_webhook_url(cls, v: str | None) -> str | None:
@@ -109,6 +127,14 @@ class Settings(BaseSettings):
         allowed_ports = [80, 88, 443, 8443]
         if v not in allowed_ports:
             raise ValueError(f"webhook_port must be one of {allowed_ports}")
+        return v
+
+    @field_validator("api_server_port")
+    @classmethod
+    def validate_api_server_port(cls, v: int) -> int:
+        """Validate that API server port doesn't conflict with webhook port."""
+        if v < 1 or v > 65535:
+            raise ValueError("api_server_port must be between 1 and 65535")
         return v
 
     @model_validator(mode="after")

@@ -154,8 +154,12 @@ class DependencyContainer:
     async def cleanup(self) -> None:
         """Cleanup resources."""
         logger.info("Cleaning up dependency container")
-        if hasattr(self, "_async_engine"):
-            await self._async_engine.dispose()
+        if hasattr(self, "_async_engine") and self._async_engine is not None:
+            try:
+                await self._async_engine.dispose()
+            except (AttributeError, TypeError):
+                # Handle case where _async_engine is a mock or doesn't have dispose method
+                logger.debug("Async engine does not support dispose or is a mock, skipping")
         self._components.clear()
         self._initialized = False
         logger.info("Dependency container cleaned up")

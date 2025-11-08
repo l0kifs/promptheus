@@ -113,6 +113,13 @@ C) Формат ответа
 [A] [B] [C]
 ```
 
+**Step 3.5: Assessment Analysis**
+```
+⏳ Evaluating your knowledge...
+
+[AI analyzes responses and calculates skill level]
+```
+
 **Step 4: Goal Selection**
 ```
 🎯 Ваша цель обучения?

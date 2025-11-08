@@ -166,31 +166,41 @@ AI_MODEL_PRIMARY=env_file/model:v1
 
     def test_settings_webhook_mode_requires_url(self, monkeypatch):
         """Test that webhook mode requires webhook_url."""
+        from promptheus.core.exceptions import ConfigurationError
+
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
         monkeypatch.setenv("BOT_MODE", "webhook")
         # webhook_url not set
 
-        with pytest.raises(ValueError, match="webhook_url is required when bot_mode is 'webhook'"):
+        with pytest.raises(
+            ConfigurationError, match="Webhook mode requires webhook_url to be configured"
+        ):
             Settings()
 
     def test_settings_webhook_url_must_be_https(self, monkeypatch):
         """Test that webhook URL must use HTTPS protocol."""
+        from promptheus.core.exceptions import ConfigurationError
+
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
         monkeypatch.setenv("BOT_MODE", "webhook")
         monkeypatch.setenv("WEBHOOK_URL", "http://example.com/webhook")  # HTTP not HTTPS
 
-        with pytest.raises(ValueError, match="webhook_url must use HTTPS protocol"):
+        with pytest.raises(
+            ConfigurationError, match="Invalid webhook URL: must use HTTPS protocol"
+        ):
             Settings()
 
     def test_settings_webhook_port_must_be_valid(self, monkeypatch):
         """Test that webhook port must be one of allowed values."""
+        from promptheus.core.exceptions import ConfigurationError
+
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_bot_token")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test_api_key")
         monkeypatch.setenv("WEBHOOK_PORT", "9999")  # Invalid port
 
-        with pytest.raises(ValueError, match="webhook_port must be one of"):
+        with pytest.raises(ConfigurationError, match="Invalid webhook port: must be one of"):
             Settings()
 
     def test_settings_valid_webhook_configuration(self, monkeypatch):

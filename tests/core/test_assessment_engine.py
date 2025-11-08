@@ -159,11 +159,15 @@ class TestAssessmentEngine:
     @pytest.mark.asyncio
     async def test_evaluate_answers_with_wrong_question_count_raises_value_error(self, engine):
         """Test that evaluation fails if question count is not 5."""
+        from promptheus.core.exceptions import AssessmentError
+
         # Temporarily modify questions to have wrong count
         original_questions = engine.get_assessment_questions
         engine.get_assessment_questions = lambda: []  # Empty list
 
-        with pytest.raises(ValueError, match="Assessment must have exactly 5 questions"):
+        with pytest.raises(
+            AssessmentError, match="Invalid assessment configuration: expected 5 questions"
+        ):
             await engine.evaluate_answers(["A", "B", "C", "A", "B"])
 
         # Restore original method

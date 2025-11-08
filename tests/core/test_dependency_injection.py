@@ -81,7 +81,9 @@ class TestDependencyContainer:
 
     def test_get_component_not_found(self, container):
         """Test getting non-existent component raises ValueError."""
-        with pytest.raises(ValueError, match="Component 'nonexistent' not found"):
+        from promptheus.core.exceptions import SystemError
+
+        with pytest.raises(SystemError, match="Component 'nonexistent' not found"):
             container.get_component("nonexistent")
 
     @pytest.mark.asyncio

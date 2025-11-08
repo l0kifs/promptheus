@@ -163,6 +163,24 @@ class TestRateLimitService:
         assert count == 0
 
     @pytest.mark.asyncio
+    async def test_cleanup_inactive_users_no_cleanup_needed(self, rate_limit_service):
+        """Test cleanup when no users need to be cleaned up."""
+        # Add some recent timestamps
+        user_id = 12345
+        current_time = time.time()
+
+        # Manually add recent timestamps (within rate limiting window and cleanup window)
+        rate_limit_service._request_history[user_id] = [current_time - 30]  # 30 seconds ago
+
+        # Cleanup should not remove this user (within 1 hour)
+        removed_count = await rate_limit_service.cleanup_inactive_users(max_age_seconds=3600)
+        assert removed_count == 0
+
+        # Verify user was not removed
+        count = await rate_limit_service.get_request_count(user_id)
+        assert count == 1
+
+    @pytest.mark.asyncio
     async def test_multiple_users_isolated(self, rate_limit_service):
         """Test that different users have isolated rate limits."""
         user1_id = 12345

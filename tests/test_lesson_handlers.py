@@ -27,6 +27,7 @@ class TestLessonHandlers:
         # Mock async methods
         learning_orchestrator.get_session_context = mocker.AsyncMock()
         learning_orchestrator.save_session_context = mocker.AsyncMock()
+        learning_orchestrator.update_session_state = mocker.AsyncMock()
         learning_orchestrator.lesson_repo = mocker.Mock()
         learning_orchestrator.lesson_repo.find_by_id = mocker.AsyncMock()
         learning_orchestrator.lesson_repo.find_by_skill_level = mocker.AsyncMock()

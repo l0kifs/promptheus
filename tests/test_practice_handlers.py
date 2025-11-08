@@ -26,6 +26,7 @@ class TestPracticeHandlers:
         # Mock async methods
         learning_orchestrator.get_session_context = mocker.AsyncMock()
         learning_orchestrator.save_session_context = mocker.AsyncMock()
+        learning_orchestrator.update_session_state = mocker.AsyncMock()
         learning_orchestrator.user_repo = mocker.Mock()
         learning_orchestrator.user_repo.find_by_telegram_id = mocker.AsyncMock()
         learning_orchestrator.lesson_repo = mocker.Mock()

@@ -76,6 +76,7 @@ class TestPracticeEvaluationE2E:
             return_value={"current_lesson_id": 1, "lesson_step": "practice"}
         )
         bot_handlers.learning_orchestrator.save_session_context = mocker.AsyncMock()
+        bot_handlers.learning_orchestrator.update_session_state = mocker.AsyncMock()
 
         # Mock AI evaluation
         bot_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(

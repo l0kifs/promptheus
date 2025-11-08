@@ -60,6 +60,13 @@ class AssessmentHandlersMixin:
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
 
+        # Update session state to ONBOARDING
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.ONBOARDING, session_context
+        )
+
         logger.debug("Assessment initialized", user_id=user_id, total_questions=len(questions))
 
         # Show first question
@@ -241,6 +248,13 @@ class AssessmentHandlersMixin:
 
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
+
+        # Update session state to MENU (ready for learning)
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.MENU, session_context
+        )
 
         # Get personalized path
         lessons = await self.learning_orchestrator.get_personalized_path(user_id, skill_level)

@@ -54,6 +54,13 @@ class PracticeHandlersMixin:
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
 
+        # Update session state to PRACTICING
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.PRACTICING, session_context
+        )
+
         keyboard = [
             [InlineKeyboardButton("💡 Show Hint", callback_data=f"hint_{lesson_id}")],
             [InlineKeyboardButton("⏭️ Skip Exercise", callback_data=f"skip_{lesson_id}")],

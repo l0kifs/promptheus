@@ -27,17 +27,14 @@ async def session_cleanup_worker(container: DependencyContainer) -> None:
             await asyncio.sleep(24 * 60 * 60)  # 24 hours in seconds
 
             logger.info("Running scheduled session cleanup")
-            # Use proper session management
-            async with container._async_session_maker() as session:
-                from promptheus.data.async_repositories import AsyncSessionRepository
+            # Use proper session management via container
+            session_repo = await container.get_session_repository()
+            deleted_count = await session_repo.cleanup_old_sessions(days_old=30)
 
-                session_repo = AsyncSessionRepository(session)
-                deleted_count = await session_repo.cleanup_old_sessions(days_old=30)
-
-                if deleted_count > 0:
-                    logger.info("Background cleanup completed", deleted_sessions=deleted_count)
-                else:
-                    logger.debug("Background cleanup completed: no old sessions found")
+            if deleted_count > 0:
+                logger.info("Background cleanup completed", deleted_sessions=deleted_count)
+            else:
+                logger.debug("Background cleanup completed: no old sessions found")
 
         except asyncio.CancelledError:
             logger.info("Session cleanup worker cancelled")

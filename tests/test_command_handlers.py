@@ -24,6 +24,10 @@ class TestCommandHandlers:
         learning_orchestrator = mocker.Mock()
         progress_tracker = mocker.Mock()
 
+        # Mock async methods
+        learning_orchestrator.get_session_context = mocker.AsyncMock()
+        learning_orchestrator.update_session_state = mocker.AsyncMock()
+
         return MockCommandHandlers(
             ai_client=ai_client,
             assessment_engine=assessment_engine,

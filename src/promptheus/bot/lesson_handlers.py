@@ -43,6 +43,13 @@ class LessonHandlersMixin:
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
 
+        # Update session state to LEARNING
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.LEARNING, session_context
+        )
+
         keyboard = [
             [InlineKeyboardButton("▶️ Start", callback_data=f"lesson_start_{lesson_id}")],
             [InlineKeyboardButton("⬅️ Back", callback_data="lesson_list")],

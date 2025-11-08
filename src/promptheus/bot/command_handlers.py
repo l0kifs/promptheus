@@ -108,6 +108,16 @@ class CommandHandlersMixin:
 
         await update.callback_query.answer()
 
+        user_id = update.effective_user.id
+
+        # Update session state to MENU
+        session_context = await self.learning_orchestrator.get_session_context(user_id)
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.MENU, session_context
+        )
+
         keyboard = [
             [InlineKeyboardButton("📖 Continue Learning", callback_data="continue")],
             [InlineKeyboardButton("📋 All Lessons", callback_data="lesson_list")],

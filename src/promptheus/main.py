@@ -135,7 +135,15 @@ async def start_bot_polling(application: Application, settings: Settings) -> Non
         logger.debug("No existing webhook to remove or removal failed", error=str(e))
 
     # Start polling
-    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    except asyncio.CancelledError:
+        logger.info("Bot polling cancelled")
+        raise
+    except Exception as e:
+        logger.error("Error in bot polling", error=str(e))
+        raise
+
     logger.info("Bot is running in polling mode. Press Ctrl+C to stop.")
 
 
@@ -273,9 +281,13 @@ async def main() -> None:
     cleanup_task = asyncio.create_task(session_cleanup_worker(container))
     logger.info("Background cleanup task started")
 
-    # Start API server and bot concurrently
-    logger.info("Starting API server and bot...")
+    # Initialize tasks
+    api_task = None
+    bot_task = None
+
     try:
+        # Start API server and bot concurrently
+        logger.info("Starting API server and bot...")
         await application.initialize()
         await application.start()
 
@@ -288,41 +300,57 @@ async def main() -> None:
         )
 
         # Run both concurrently
-        await asyncio.gather(api_task, bot_task, return_exceptions=True)
+        await asyncio.gather(api_task, bot_task, cleanup_task, return_exceptions=True)
 
-    except Exception as e:
-        logger.critical("Failed to start services", error=str(e))
-        return
-
-    # Keep running
-    try:
-        await asyncio.Event().wait()
     except (KeyboardInterrupt, asyncio.CancelledError):
-        pass
+        logger.info("Shutdown signal received")
+    except Exception as e:
+        logger.critical("Error during operation", error=str(e))
     finally:
-        logger.info("Received shutdown signal, stopping services...")
-        try:
-            # Cancel background tasks
+        logger.info("Shutting down services...")
+
+        # Cancel background cleanup task
+        if cleanup_task and not cleanup_task.done():
             cleanup_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await cleanup_task
+            logger.info("Background session cleanup task stopped")
 
-            # Stop telegram bot (safe for both polling and webhook modes)
-            try:
-                if hasattr(application, "updater") and application.updater:
-                    await application.updater.stop()  # type: ignore
-            except Exception:
-                pass  # updater may not exist in webhook mode
+        # Cancel API task
+        if api_task and not api_task.done():
+            api_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await api_task
+            logger.info("API server task cancelled")
+
+        # Cancel bot task
+        if bot_task and not bot_task.done():
+            bot_task.cancel()
+            with contextlib.suppress(Exception):  # Suppress all exceptions during shutdown
+                await bot_task
+            logger.info("Bot task cancelled")
+
+        # Stop telegram bot (safe for both polling and webhook modes)
+        try:
+            # Stop updater first to prevent network errors during shutdown
+            if hasattr(application, "updater") and application.updater:
+                await application.updater.stop()
+                logger.info("Telegram updater stopped")
 
             await application.stop()
             await application.shutdown()
-
-            # Cleanup database connections
-            await container.cleanup()
-
-            logger.info("Services stopped gracefully")
+            logger.info("Telegram application stopped")
         except Exception as e:
-            logger.error("Error during shutdown", error=str(e))
+            logger.error(f"Error stopping Telegram application: {e}")
+
+        # Cleanup database connections
+        try:
+            await container.cleanup()
+            logger.info("Dependency container cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up container: {e}")
+
+        logger.info("All services stopped gracefully")
 
 
 if __name__ == "__main__":

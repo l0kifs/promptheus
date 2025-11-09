@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
@@ -220,3 +221,75 @@ class LessonContentSchema(BaseModel):
             JSON representation of the lesson content
         """
         return self.model_dump_json(indent=2)
+
+
+class LessonVersionInfo(BaseModel):
+    """Lesson version information schema."""
+
+    id: int
+    version: str
+    content_hash: str
+    is_active: bool
+    created_at: datetime
+    created_by: str | None = None
+
+    @field_validator("version")
+    @classmethod
+    def validate_version_format(cls, v: str) -> str:
+        """Validate version string format."""
+        if not re.match(r"^\d+\.\d+\.\d+$", v):
+            raise ValueError("Version must follow semantic versioning format (X.Y.Z)")
+        return v
+
+
+class LessonVersionDetail(LessonVersionInfo):
+    """Detailed lesson version schema with content."""
+
+    content_snapshot: dict[str, Any]
+
+
+class VersionComparison(BaseModel):
+    """Version comparison result schema."""
+
+    lesson_id: int
+    changed_fields: list[str]
+    version_comparison: dict[str, Any]
+    hash_changed: bool
+    created_at_diff: dict[str, str | None]
+
+
+class CreateVersionRequest(BaseModel):
+    """Request schema for creating a new version."""
+
+    version: str
+    bump_type: str = "patch"
+
+    @field_validator("version")
+    @classmethod
+    def validate_version_format(cls, v: str) -> str:
+        """Validate version string format."""
+        if not re.match(r"^\d+\.\d+\.\d+$", v):
+            raise ValueError("Version must follow semantic versioning format (X.Y.Z)")
+        return v
+
+    @field_validator("bump_type")
+    @classmethod
+    def validate_bump_type(cls, v: str) -> str:
+        """Validate bump type."""
+        if v not in ["major", "minor", "patch"]:
+            raise ValueError("Bump type must be 'major', 'minor', or 'patch'")
+        return v
+
+
+class RollbackVersionRequest(BaseModel):
+    """Request schema for rolling back to a version."""
+
+    target_version: str
+
+    @field_validator("target_version")
+    @classmethod
+    def validate_version_format(cls, v: str) -> str:
+        """Validate version string format."""
+        if not re.match(r"^\d+\.\d+\.\d+$", v):
+            raise ValueError("Version must follow semantic versioning format (X.Y.Z)")
+        return v

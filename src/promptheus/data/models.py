@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -139,6 +140,31 @@ class Lesson(Base):
 
     # Relationships
     progress = relationship("UserProgress", back_populates="lesson")
+    versions = relationship("LessonVersion", back_populates="lesson", cascade="all, delete-orphan")
+
+
+class LessonVersion(Base):
+    """Lesson version history model."""
+
+    __tablename__ = "lesson_version"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lesson_id = Column(Integer, ForeignKey("lesson.id"), nullable=False, index=True)
+    version = Column(String(50), nullable=False)
+    content_hash = Column(String(64), nullable=False)  # SHA-256 hash
+    content_snapshot = Column(JSON, nullable=False)  # Full lesson content at this version
+    is_active = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    created_by = Column(String(255), nullable=True)  # User/system that created this version
+
+    __table_args__ = (
+        UniqueConstraint("lesson_id", "version", name="uq_lesson_version_lesson_version"),
+        Index("ix_lesson_version_lesson_id_is_active", "lesson_id", "is_active"),
+        Index("ix_lesson_version_created_at", "created_at"),
+    )
+
+    # Relationships
+    lesson = relationship("Lesson", back_populates="versions")
 
 
 class UserProgress(Base):

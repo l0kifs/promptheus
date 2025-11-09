@@ -17,6 +17,7 @@ from promptheus.core.progress_tracker import ProgressTracker
 from promptheus.core.rate_limit_service import RateLimitService
 from promptheus.data.async_repositories import (
     AsyncLessonRepository,
+    AsyncLessonVersionRepository,
     AsyncProgressRepository,
     AsyncSessionRepository,
     AsyncUserRepository,
@@ -24,6 +25,7 @@ from promptheus.data.async_repositories import (
 from promptheus.data.file_watcher import FileWatcher
 from promptheus.data.lesson_cache import LessonCache
 from promptheus.data.lesson_loader import LessonLoaderService
+from promptheus.data.version_manager import VersionManager
 
 
 class DependencyContainer:
@@ -91,6 +93,10 @@ class DependencyContainer:
             lesson_cache = LessonCache()
             self._register_component("lesson_cache", lesson_cache)
 
+            # Initialize version manager
+            version_manager = VersionManager()
+            self._register_component("version_manager", version_manager)
+
             # Initialize file watcher (will be started in FastAPI lifespan)
             file_watcher = FileWatcher()
             self._register_component("file_watcher", file_watcher)
@@ -135,6 +141,10 @@ class DependencyContainer:
     async def get_session_repository(self) -> AsyncSessionRepository:
         """Get SessionRepository with async session maker."""
         return AsyncSessionRepository(self._async_session_maker)
+
+    async def get_version_repository(self) -> AsyncLessonVersionRepository:
+        """Get VersionRepository with async session maker."""
+        return AsyncLessonVersionRepository(self._async_session_maker)
 
     async def get_learning_flow_orchestrator(self) -> LearningFlowOrchestrator:
         """Get LearningFlowOrchestrator with repositories."""

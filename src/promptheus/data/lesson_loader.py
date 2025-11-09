@@ -66,6 +66,7 @@ class LessonLoaderService:
         lesson_repo: AsyncLessonRepository | None = None,
         schemas: Any = None,
         cache: LessonCache | None = None,
+        version_manager: Any = None,
     ) -> None:
         """Initialize lesson loader service.
 
@@ -74,11 +75,13 @@ class LessonLoaderService:
             lesson_repo: Lesson repository (will be injected via dependency container)
             schemas: Schema classes (will be injected via dependency container)
             cache: Lesson cache for in-memory storage (will be injected via dependency container)
+            version_manager: Version manager service (will be injected via dependency container)
         """
         self.settings = settings or get_settings()
         self.lesson_repo = lesson_repo
         self.schemas = schemas or LessonContentSchema
         self.cache = cache
+        self.version_manager = version_manager
 
     async def get_lesson(self, skill_level: str, slug: str) -> LessonContentSchema | None:
         """Get lesson from cache or database.
@@ -417,12 +420,85 @@ class LessonLoaderService:
             if not slug:
                 raise ValueError(f"Cannot generate slug for title: {schema.title}")
 
+            # Prepare content for versioning
+            content_dict = {
+                "title": schema.title,
+                "skill_level": schema.skill_level.value,
+                "slug": slug,
+                "tags": [tag.value for tag in schema.tags],
+                "theory_content": schema.theory_content.model_dump(),
+                "examples": schema.examples.model_dump(),
+                "exercises": schema.exercises.model_dump(),
+            }
+
+            # Handle versioning if version manager is available
+            version_created = False
+            if self.version_manager and self.lesson_repo:
+                try:
+                    # Find existing lesson
+                    existing_lesson = await self.lesson_repo.find_by_slug(schema.skill_level, slug)
+                    if existing_lesson:
+                        # Check if content changed
+                        change_info = self.version_manager.detect_changes(
+                            lesson_id=existing_lesson.id,
+                            new_content=content_dict,
+                            current_hash=None,  # Will be looked up internally if needed
+                        )
+
+                        if change_info:
+                            # Content changed, create new version
+                            # For now, we'll handle versioning through direct repository access
+                            # This will be improved when dependency injection is updated
+                            from promptheus.data.async_repositories import (
+                                AsyncLessonVersionRepository,
+                            )
+
+                            version_repo = AsyncLessonVersionRepository(
+                                self.lesson_repo.session_maker
+                            )
+                            current_active = await version_repo.find_active_by_lesson(
+                                existing_lesson.id
+                            )
+                            current_version = current_active.version if current_active else "1.0.0"
+                            new_version = self.version_manager.increment_version(current_version)
+
+                            # Create new version
+                            await version_repo.create(
+                                lesson_id=existing_lesson.id,
+                                version=new_version,
+                                content_hash=change_info["new_hash"],
+                                content_snapshot=content_dict,
+                                is_active=True,
+                                created_by="hot_reload",
+                            )
+
+                            # Deactivate other versions
+                            await version_repo.deactivate_other_versions(
+                                existing_lesson.id, keep_version_id=None
+                            )
+
+                            version_created = True
+                            logger.info(
+                                "New version created",
+                                lesson_id=existing_lesson.id,
+                                version=new_version,
+                                title=schema.title,
+                            )
+                        else:
+                            logger.debug("No content changes detected", title=schema.title)
+                    else:
+                        logger.debug("New lesson, no versioning needed yet", title=schema.title)
+                except Exception as e:
+                    logger.warning(
+                        "Version management failed, continuing with reload",
+                        error=str(e),
+                        title=schema.title,
+                    )
+
             # Update cache if available
             if self.cache:
                 await self.cache.set(schema.skill_level, slug, schema)
                 logger.info("Lesson reloaded and cached", title=schema.title, slug=slug)
-            else:
-                logger.warning("No cache available for lesson reload")
 
             # Update database if repository available
             if self.lesson_repo:
@@ -439,7 +515,12 @@ class LessonLoaderService:
                     examples=schema.examples.model_dump(),
                     exercises=schema.exercises.model_dump(),
                 )
-                logger.info("Lesson reloaded and saved to database", title=schema.title, slug=slug)
+                logger.info(
+                    "Lesson reloaded and saved to database",
+                    title=schema.title,
+                    slug=slug,
+                    version_created=version_created,
+                )
 
             return True
 

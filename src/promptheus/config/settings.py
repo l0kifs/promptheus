@@ -20,6 +20,18 @@ class Settings(BaseSettings):
 
     # Telegram Bot
     telegram_bot_token: str = Field(..., description="Telegram bot token")
+    telegram_read_timeout: float = Field(
+        default=5.0,
+        description="Telegram API read timeout in seconds (for graceful shutdown)",
+    )
+    telegram_write_timeout: float = Field(
+        default=5.0,
+        description="Telegram API write timeout in seconds",
+    )
+    telegram_connect_timeout: float = Field(
+        default=5.0,
+        description="Telegram API connect timeout in seconds",
+    )
 
     # OpenRouter AI
     openrouter_api_key: str = Field(..., description="OpenRouter API key")

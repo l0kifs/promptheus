@@ -13,6 +13,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.request import HTTPXRequest
 
 from promptheus.api.admin import router as admin_router
 from promptheus.api.health import router as health_router
@@ -259,7 +260,18 @@ async def main() -> None:
     # Create application
     logger.info("Creating Telegram application")
     try:
-        application = Application.builder().token(settings.telegram_bot_token).build()
+        # Configure with timeouts for graceful shutdown
+        request = HTTPXRequest(
+            read_timeout=settings.telegram_read_timeout,
+            write_timeout=settings.telegram_write_timeout,
+            connect_timeout=settings.telegram_connect_timeout,
+        )
+        application = (
+            Application.builder()
+            .token(settings.telegram_bot_token)
+            .get_updates_request(request)
+            .build()
+        )
         logger.debug("Telegram application created")
     except Exception as e:
         logger.critical("Failed to create Telegram application", error=str(e))
@@ -381,7 +393,9 @@ async def main() -> None:
         try:
             # Stop updater first to prevent network errors during shutdown
             if hasattr(application, "updater") and application.updater:
-                await application.updater.stop()
+                with contextlib.suppress(Exception):
+                    # Suppress timeout errors during cleanup - they're expected during shutdown
+                    await application.updater.stop()
                 logger.info("Telegram updater stopped")
 
             await application.stop()

@@ -168,12 +168,20 @@ class TestUserOnboardingE2E:
         answer_update.callback_query.data = "answer_B"
         answer_update.callback_query.answer = mocker.AsyncMock()
         answer_update.callback_query.edit_message_text = mocker.AsyncMock()
+        answer_update.callback_query.message = mocker.Mock()
+        answer_update.callback_query.message.reply_text = mocker.AsyncMock()
+        answer_update.callback_query.message.chat = mocker.Mock()
+        answer_update.callback_query.message.chat.send_action = mocker.AsyncMock()
+
+        # Mock the loading message returned by reply_text
+        loading_msg = mocker.AsyncMock()
+        answer_update.callback_query.message.reply_text.return_value = loading_msg
 
         await bot_handlers.answer_callback(answer_update, new_user_context)
 
-        # Verify goal selection
-        answer_update.callback_query.edit_message_text.assert_called_once()
-        goal_call_args = answer_update.callback_query.edit_message_text.call_args
+        # Verify goal selection shown by editing the loading message
+        loading_msg.edit_text.assert_called_once()
+        goal_call_args = loading_msg.edit_text.call_args
         assert "learning goal" in goal_call_args[0][0].lower()
         assert "Professional" in str(goal_call_args[1]["reply_markup"])
 

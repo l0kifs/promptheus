@@ -57,7 +57,7 @@ class TestPracticeEvaluationE2E:
                 "id": 1,
                 "title": "Introduction to Prompt Engineering",
                 "skill_level": "beginner",
-                "order_index": 1,
+                "position": 1,
                 "exercises": {
                     "scenarios": [
                         {
@@ -76,6 +76,7 @@ class TestPracticeEvaluationE2E:
             return_value={"current_lesson_id": 1, "lesson_step": "practice"}
         )
         bot_handlers.learning_orchestrator.save_session_context = mocker.AsyncMock()
+        bot_handlers.learning_orchestrator.update_session_state = mocker.AsyncMock()
 
         # Mock AI evaluation
         bot_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
@@ -89,6 +90,7 @@ class TestPracticeEvaluationE2E:
         # Mock progress tracker methods
         bot_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
         bot_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
+        bot_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
 
         # Step 1: Start practice
         await bot_handlers.practice_callback(practice_user_update, practice_user_context)
@@ -106,6 +108,8 @@ class TestPracticeEvaluationE2E:
         prompt_update.message = mocker.Mock()
         prompt_update.message.text = "Create a Python function that reads a CSV file and calculates statistics for numerical columns"
         prompt_update.message.reply_text = mocker.AsyncMock()
+        prompt_update.message.chat = mocker.Mock()
+        prompt_update.message.chat.send_action = mocker.AsyncMock()
 
         # Mock the loading message returned by reply_text
         loading_msg = mocker.AsyncMock()
@@ -192,9 +196,7 @@ class TestPracticeEvaluationE2E:
         mock_user_repo.find_by_telegram_id.return_value = mock_user
 
         # Mock lesson
-        mock_lesson = type(
-            "MockLesson", (), {"id": 1, "skill_level": "beginner", "order_index": 1}
-        )()
+        mock_lesson = type("MockLesson", (), {"id": 1, "skill_level": "beginner", "position": 1})()
         mock_lesson_repo.find_by_id.return_value = mock_lesson
         mock_lesson_repo.find_next_lesson.return_value = None  # No next lesson
 
@@ -265,6 +267,8 @@ class TestPracticeEvaluationE2E:
         prompt_update.message = mocker.Mock()
         prompt_update.message.text = "Test prompt"
         prompt_update.message.reply_text = mocker.AsyncMock()
+        prompt_update.message.chat = mocker.Mock()
+        prompt_update.message.chat.send_action = mocker.AsyncMock()
 
         # Mock the loading message returned by reply_text
         loading_msg = mocker.AsyncMock()

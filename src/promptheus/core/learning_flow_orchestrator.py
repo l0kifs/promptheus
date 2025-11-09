@@ -36,7 +36,7 @@ class LearningFlowOrchestrator:
             {
                 "id": int(lesson.id),  # type: ignore
                 "title": str(lesson.title),
-                "order": int(lesson.order_index),  # type: ignore
+                "order": int(lesson.position),  # type: ignore
             }
             for lesson in lessons
         ]
@@ -60,7 +60,7 @@ class LearningFlowOrchestrator:
 
         next_lesson = await self.lesson_repo.find_next_lesson(
             user.skill_level,
-            current_lesson.order_index,  # type: ignore
+            current_lesson.position,  # type: ignore
         )
 
         if next_lesson:
@@ -68,7 +68,7 @@ class LearningFlowOrchestrator:
             return {
                 "id": int(next_lesson.id),  # type: ignore
                 "title": str(next_lesson.title),
-                "order": int(next_lesson.order_index),  # type: ignore
+                "order": int(next_lesson.position),  # type: ignore
             }
 
         logger.info("No next lesson found", user_id=user_id)

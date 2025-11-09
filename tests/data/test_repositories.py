@@ -26,7 +26,12 @@ class TestUserRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create user repository."""
-        return AsyncUserRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncUserRepository(session_maker)  # type: ignore
 
     async def test_create_user(self, repo, async_db_session: AsyncSession):
         """Test creating a new user."""
@@ -79,14 +84,20 @@ class TestLessonRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create lesson repository."""
-        return AsyncLessonRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncLessonRepository(session_maker)  # type: ignore
 
     async def test_create_lesson(self, repo, async_db_session: AsyncSession):
         """Test creating a new lesson."""
         lesson = await repo.create(
             title="New Lesson",
             skill_level=SkillLevel.INTERMEDIATE,
-            order_index=1,
+            slug="new-lesson",
+            position=10,
             tags=["test"],
             theory_content={"sections": []},
             examples={"comparisons": []},
@@ -95,6 +106,8 @@ class TestLessonRepository:
 
         assert lesson.title == "New Lesson"
         assert lesson.skill_level == SkillLevel.INTERMEDIATE
+        assert lesson.slug == "new-lesson"
+        assert lesson.position == 10
 
         # Verify in database
         db_lesson = await async_db_session.scalar(
@@ -109,6 +122,14 @@ class TestLessonRepository:
         assert lesson is not None
         assert lesson.title == async_sample_lesson.title  # type: ignore
 
+    async def test_find_by_slug(self, repo, async_sample_lesson: Lesson):
+        """Test finding lesson by slug and skill level."""
+        lesson = await repo.find_by_slug(async_sample_lesson.skill_level, async_sample_lesson.slug)
+
+        assert lesson is not None
+        assert lesson.id == async_sample_lesson.id
+        assert lesson.slug == async_sample_lesson.slug
+
     async def test_find_by_skill_level(self, repo, async_multiple_lessons):
         """Test finding lessons by skill level."""
         lessons = await repo.find_by_skill_level(SkillLevel.BEGINNER)
@@ -119,16 +140,16 @@ class TestLessonRepository:
 
     async def test_find_next_lesson(self, repo, async_multiple_lessons):
         """Test finding next lesson in sequence."""
-        # Sort the fixture lessons by order_index to find the expected next one
-        sorted_lessons = sorted(async_multiple_lessons, key=lambda lesson: lesson.order_index)
+        # Sort the fixture lessons by position to find the expected next one
+        sorted_lessons = sorted(async_multiple_lessons, key=lambda lesson: lesson.position)
         first_lesson = sorted_lessons[0]
 
         # Find the next lesson using the repo method
-        next_lesson = await repo.find_next_lesson(SkillLevel.BEGINNER, first_lesson.order_index)
+        next_lesson = await repo.find_next_lesson(SkillLevel.BEGINNER, first_lesson.position)
 
         if next_lesson:
-            # The next lesson should have order_index > first_lesson.order_index
-            assert next_lesson.order_index > first_lesson.order_index
+            # The next lesson should have position > first_lesson.position
+            assert next_lesson.position > first_lesson.position
             # The next lesson should be for BEGINNER skill level
             assert next_lesson.skill_level == SkillLevel.BEGINNER
 
@@ -139,7 +160,12 @@ class TestProgressRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create progress repository."""
-        return AsyncProgressRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncProgressRepository(session_maker)  # type: ignore
 
     async def test_create_progress(
         self, repo, async_sample_user_id: int, async_sample_lesson_id: int
@@ -149,7 +175,7 @@ class TestProgressRepository:
 
         assert progress.user_id == async_sample_user_id  # type: ignore
         assert progress.lesson_id == async_sample_lesson_id  # type: ignore
-        assert progress.status == LessonStatus.IN_PROGRESS
+        assert progress.status == LessonStatus.NOT_STARTED
 
     async def test_find_by_user_and_lesson(
         self, repo, async_sample_user_id: int, async_sample_lesson_id: int
@@ -183,7 +209,12 @@ class TestSessionRepository:
     @pytest.fixture
     async def repo(self, async_db_session: AsyncSession):
         """Create session repository."""
-        return AsyncSessionRepository(async_db_session)
+
+        # Create a session maker that returns the test session
+        def session_maker():
+            return async_db_session
+
+        return AsyncSessionRepository(session_maker)  # type: ignore
 
     async def test_create_session(self, repo, async_sample_user_id: int):
         """Test creating session."""

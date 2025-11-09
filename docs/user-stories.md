@@ -29,7 +29,8 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 - Test consists of 5 multiple-choice questions
 - Each question displays progress (1/5, 2/5...)
 - Answers are saved in session `context_data`
-- Upon completion, `skill_level` is calculated (beginner/intermediate/advanced)
+- Upon completion, "⏳ Evaluating your knowledge..." loading message is shown
+- AI analyzes responses and calculates `skill_level` (beginner/intermediate/advanced)
 - Result is saved in `User` table
 - Total completion time 2-3 minutes
 

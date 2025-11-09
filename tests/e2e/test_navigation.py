@@ -35,6 +35,10 @@ class TestNavigationE2E:
         mock_user_repo = mocker.AsyncMock()
         bot_handlers.learning_orchestrator.user_repo = mock_user_repo
 
+        # Mock session methods
+        bot_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(return_value={})
+        bot_handlers.learning_orchestrator.update_session_state = mocker.AsyncMock()
+
         # Mock existing user
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
         mock_user_repo.find_by_telegram_id.return_value = mock_user
@@ -91,6 +95,10 @@ class TestNavigationE2E:
         bot_handlers.learning_orchestrator.user_repo = mock_user_repo
         bot_handlers.learning_orchestrator.lesson_repo = mock_lesson_repo
 
+        # Mock session methods
+        bot_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(return_value={})
+        bot_handlers.learning_orchestrator.update_session_state = mocker.AsyncMock()
+
         # Mock user and lessons
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
         mock_user_repo.find_by_telegram_id.return_value = mock_user
@@ -130,6 +138,10 @@ class TestNavigationE2E:
         bot_handlers.learning_orchestrator.user_repo = mock_user_repo
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
         mock_user_repo.find_by_telegram_id.return_value = mock_user
+
+        # Mock session methods
+        bot_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(return_value={})
+        bot_handlers.learning_orchestrator.update_session_state = mocker.AsyncMock()
 
         # Step 1: Be in some section (simulate lesson view)
         lesson_view_update = mocker.Mock(spec=Update)

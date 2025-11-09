@@ -352,22 +352,16 @@ Structured in 2-3 short messages:
 3. Improved version
 ```
 
-**Implementation (message_formatter.py)**:
+**Implementation**:
 ```python
-def format_feedback(self, score, missing, good, improved):
-    messages = []
-    # Builds list of messages
-    return messages  # Returns list
+# Feedback is sent as a single comprehensive message
+# containing score, strengths, improvements, and improved version
+feedback_text = "📝 *Your Prompt:*\n" + f"_{user_prompt}_\n\n" + f"🔍 *Score:* {score}/10\n\n" + ...
+
+await loading_msg.edit_text(feedback_text, ...)
 ```
 
-**handlers.py**:
-```python
-feedback_messages = self.formatter.format_feedback(...)
-# But only the first message is sent!
-await query.edit_message_text(feedback_messages[0], ...)
-```
-
-❌ **Discrepancy**: A list of 2-3 messages is built but only the first is sent.
+⚠️ **Accepted as-is**: Single message approach provides better UX by showing all feedback at once without message fragmentation.
 
 ---
 

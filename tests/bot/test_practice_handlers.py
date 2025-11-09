@@ -22,10 +22,12 @@ class TestPracticeHandlers:
         assessment_engine = mocker.Mock()
         learning_orchestrator = mocker.Mock()
         progress_tracker = mocker.Mock()
+        rate_limit_service = mocker.Mock()
 
         # Mock async methods
         learning_orchestrator.get_session_context = mocker.AsyncMock()
         learning_orchestrator.save_session_context = mocker.AsyncMock()
+        learning_orchestrator.update_session_state = mocker.AsyncMock()
         learning_orchestrator.user_repo = mocker.Mock()
         learning_orchestrator.user_repo.find_by_telegram_id = mocker.AsyncMock()
         learning_orchestrator.lesson_repo = mocker.Mock()
@@ -41,6 +43,7 @@ class TestPracticeHandlers:
             assessment_engine=assessment_engine,
             learning_orchestrator=learning_orchestrator,
             progress_tracker=progress_tracker,
+            rate_limit_service=rate_limit_service,
         )
 
     @pytest.fixture
@@ -157,7 +160,7 @@ class TestPracticeHandlers:
 
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.skill_level = mocker.Mock()
-        mock_current_lesson.order_index = 1
+        mock_current_lesson.position = 1
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )
@@ -193,7 +196,7 @@ class TestPracticeHandlers:
 
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.skill_level = mocker.Mock()
-        mock_current_lesson.order_index = 5
+        mock_current_lesson.position = 5
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )
@@ -246,6 +249,11 @@ class TestPracticeHandlers:
         loading_msg.edit_text = mocker.AsyncMock()
         mock_text_update.message.reply_text.return_value = loading_msg
 
+        # Mock chat for typing indicator
+        mock_chat = mocker.Mock()
+        mock_chat.send_action = mocker.AsyncMock()
+        mock_text_update.message.chat = mock_chat
+
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
         # Verify AI evaluation called
@@ -256,6 +264,9 @@ class TestPracticeHandlers:
 
         # Verify lesson completed (score >= 7)
         mock_handlers.progress_tracker.complete_lesson.assert_called_once_with(12345, 1, 8)
+
+        # Verify typing indicator was sent
+        mock_chat.send_action.assert_called_once()
 
         # Verify feedback sent
         assert mock_text_update.message.reply_text.call_count == 1  # Only loading message
@@ -271,7 +282,7 @@ class TestPracticeHandlers:
         assert len(keyboard) == 2  # Two rows
         assert "Lesson Complete" in keyboard[0][0].text
         assert keyboard[0][0].callback_data == "lesson_complete_1"
-        assert "Menu" in keyboard[1][0].text
+        assert "Back to Examples" in keyboard[1][0].text
 
     @pytest.mark.asyncio
     async def test_text_message_handler_not_practice_mode(
@@ -337,6 +348,11 @@ class TestPracticeHandlers:
         loading_msg.edit_text = mocker.AsyncMock()
         mock_text_update.message.reply_text.return_value = loading_msg
 
+        # Mock chat for typing indicator
+        mock_chat = mocker.Mock()
+        mock_chat.send_action = mocker.AsyncMock()
+        mock_text_update.message.chat = mock_chat
+
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
         # Verify error message sent
@@ -370,6 +386,11 @@ class TestPracticeHandlers:
         loading_msg.edit_text = mocker.AsyncMock()
         mock_text_update.message.reply_text.return_value = loading_msg
 
+        # Mock chat for typing indicator
+        mock_chat = mocker.Mock()
+        mock_chat.send_action = mocker.AsyncMock()
+        mock_text_update.message.chat = mock_chat
+
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
         # Verify progress incremented but lesson not completed
@@ -390,7 +411,7 @@ class TestPracticeHandlers:
         assert len(keyboard) == 2  # Two rows
         assert "Try Again" in keyboard[0][0].text
         assert keyboard[0][0].callback_data == "practice_1"
-        assert "Menu" in keyboard[1][0].text
+        assert "Back to Examples" in keyboard[1][0].text
 
     # =====================================================================
     # REGRESSION TESTS FOR SCORE SAVING BUG FIX
@@ -403,7 +424,7 @@ class TestPracticeHandlers:
         self, mock_handlers, mock_text_update, mock_context, mocker
     ):
         """Test that scores below 7 are recorded in database.
-        
+
         REGRESSION TEST: Previously, only scores >= 7 were saved because
         record_attempt() was never called for low scores. This test ensures
         ALL scores are now saved regardless of value.
@@ -431,6 +452,11 @@ class TestPracticeHandlers:
         loading_msg.edit_text = mocker.AsyncMock()
         mock_text_update.message.reply_text.return_value = loading_msg
 
+        # Mock chat for typing indicator
+        mock_chat = mocker.Mock()
+        mock_chat.send_action = mocker.AsyncMock()
+        mock_text_update.message.chat = mock_chat
+
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
         # CRITICAL: Verify record_attempt was called with the low score
@@ -448,7 +474,7 @@ class TestPracticeHandlers:
         self, mock_handlers, mock_text_update, mock_context, mocker
     ):
         """Test that scores >= 7 are recorded AND lesson is completed.
-        
+
         REGRESSION TEST: Verifies that high scores still trigger both
         record_attempt() AND complete_lesson() calls.
         """
@@ -475,6 +501,11 @@ class TestPracticeHandlers:
         loading_msg.edit_text = mocker.AsyncMock()
         mock_text_update.message.reply_text.return_value = loading_msg
 
+        # Mock chat for typing indicator
+        mock_chat = mocker.Mock()
+        mock_chat.send_action = mocker.AsyncMock()
+        mock_text_update.message.chat = mock_chat
+
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
         # CRITICAL: Verify record_attempt was called FIRST with the score
@@ -491,7 +522,7 @@ class TestPracticeHandlers:
         self, mock_handlers, mock_text_update, mock_context, mocker
     ):
         """Test that score exactly at threshold (7) is saved and completes lesson.
-        
+
         REGRESSION TEST: Boundary test to ensure score of 7 triggers both
         record_attempt() and complete_lesson().
         """
@@ -518,6 +549,11 @@ class TestPracticeHandlers:
         loading_msg.edit_text = mocker.AsyncMock()
         mock_text_update.message.reply_text.return_value = loading_msg
 
+        # Mock chat for typing indicator
+        mock_chat = mocker.Mock()
+        mock_chat.send_action = mocker.AsyncMock()
+        mock_text_update.message.chat = mock_chat
+
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
         # Verify record_attempt called with threshold score
@@ -534,7 +570,7 @@ class TestPracticeHandlers:
         self, mock_handlers, mock_text_update, mock_context, mocker
     ):
         """Test that multiple attempts with different scores all get recorded.
-        
+
         REGRESSION TEST: Simulates user making multiple attempts with varying
         scores (2, 6, 8) to ensure all are saved. This matches the real bug
         scenario where user had scores 2 and 8 but average showed 8.0.
@@ -555,6 +591,11 @@ class TestPracticeHandlers:
         loading_msg = mocker.Mock()
         loading_msg.edit_text = mocker.AsyncMock()
         mock_text_update.message.reply_text.return_value = loading_msg
+
+        # Mock chat for typing indicator
+        mock_chat = mocker.Mock()
+        mock_chat.send_action = mocker.AsyncMock()
+        mock_text_update.message.chat = mock_chat
 
         # Simulate three attempts with different scores: 2, 6, 8
         scores = [2, 6, 8]

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -18,6 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from promptheus.core.exceptions import ValidationError
 from promptheus.data.database import Base
 
 
@@ -86,6 +88,34 @@ class User(Base):
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
     session = relationship("UserSession", back_populates="user", uselist=False)
 
+    @staticmethod
+    def validate_skill_level_value(skill_level: str) -> None:
+        """Validate that skill level string is a valid enum value."""
+        try:
+            SkillLevel(skill_level)
+        except ValueError as e:
+            raise ValidationError(
+                f"Invalid skill level: {skill_level}. Must be one of {[e.value for e in SkillLevel]}",
+                details={
+                    "field": "skill_level",
+                    "value": skill_level,
+                    "valid_values": [e.value for e in SkillLevel],
+                },
+            ) from e
+
+    @staticmethod
+    def validate_assessment_score_value(assessment_score: int | None) -> None:
+        """Validate that assessment score is within valid range."""
+        if assessment_score is not None and (assessment_score < 0 or assessment_score > 100):
+            raise ValidationError(
+                f"Invalid assessment score: {assessment_score}. Must be between 0 and 100",
+                details={
+                    "field": "assessment_score",
+                    "value": assessment_score,
+                    "valid_range": "0-100",
+                },
+            )
+
 
 class Lesson(Base):
     """Lesson model."""
@@ -95,7 +125,8 @@ class Lesson(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String(255), nullable=False, unique=True)
     skill_level = Column(Enum(SkillLevel), nullable=False, index=True)
-    order_index = Column(Integer, nullable=False)
+    slug = Column(String(100), nullable=False)
+    position = Column(Integer, nullable=True)
     tags = Column(JSON, nullable=False)
     theory_content = Column(JSON, nullable=False)
     examples = Column(JSON, nullable=False)
@@ -103,12 +134,37 @@ class Lesson(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     __table_args__ = (
-        UniqueConstraint("skill_level", "order_index", name="uq_lesson_skill_level_order_index"),
-        Index("ix_lesson_skill_level_order_index", "skill_level", "order_index"),
+        UniqueConstraint("skill_level", "slug", name="uq_lesson_skill_level_slug"),
+        Index("ix_lesson_skill_level_slug", "skill_level", "slug"),
     )
 
     # Relationships
     progress = relationship("UserProgress", back_populates="lesson")
+    versions = relationship("LessonVersion", back_populates="lesson", cascade="all, delete-orphan")
+
+
+class LessonVersion(Base):
+    """Lesson version history model."""
+
+    __tablename__ = "lesson_version"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lesson_id = Column(Integer, ForeignKey("lesson.id"), nullable=False, index=True)
+    version = Column(String(50), nullable=False)
+    content_hash = Column(String(64), nullable=False)  # SHA-256 hash
+    content_snapshot = Column(JSON, nullable=False)  # Full lesson content at this version
+    is_active = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    created_by = Column(String(255), nullable=True)  # User/system that created this version
+
+    __table_args__ = (
+        UniqueConstraint("lesson_id", "version", name="uq_lesson_version_lesson_version"),
+        Index("ix_lesson_version_lesson_id_is_active", "lesson_id", "is_active"),
+        Index("ix_lesson_version_created_at", "created_at"),
+    )
+
+    # Relationships
+    lesson = relationship("Lesson", back_populates="versions")
 
 
 class UserProgress(Base):
@@ -136,6 +192,15 @@ class UserProgress(Base):
     # Relationships
     user = relationship("User", back_populates="progress")
     lesson = relationship("Lesson", back_populates="progress")
+
+    @staticmethod
+    def validate_last_score_value(last_score: int | None) -> None:
+        """Validate that last score is within valid range."""
+        if last_score is not None and (last_score < 0 or last_score > 100):
+            raise ValidationError(
+                f"Invalid last score: {last_score}. Must be between 0 and 100",
+                details={"field": "last_score", "value": last_score, "valid_range": "0-100"},
+            )
 
 
 class UserSession(Base):

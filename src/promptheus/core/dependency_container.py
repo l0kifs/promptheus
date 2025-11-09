@@ -1,5 +1,7 @@
 """Dependency injection container for managing application components."""
 
+import asyncio
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -9,14 +11,21 @@ from promptheus.ai.openrouter_client import OpenRouterClient
 from promptheus.ai.prompt_template_manager import PromptTemplateManager
 from promptheus.config import get_settings
 from promptheus.core.assessment_engine import AssessmentEngine
+from promptheus.core.exceptions import SystemError
 from promptheus.core.learning_flow_orchestrator import LearningFlowOrchestrator
 from promptheus.core.progress_tracker import ProgressTracker
+from promptheus.core.rate_limit_service import RateLimitService
 from promptheus.data.async_repositories import (
     AsyncLessonRepository,
+    AsyncLessonVersionRepository,
     AsyncProgressRepository,
     AsyncSessionRepository,
     AsyncUserRepository,
 )
+from promptheus.data.file_watcher import FileWatcher
+from promptheus.data.lesson_cache import LessonCache
+from promptheus.data.lesson_loader import LessonLoaderService
+from promptheus.data.version_manager import VersionManager
 
 
 class DependencyContainer:
@@ -76,6 +85,22 @@ class DependencyContainer:
             assessment_engine = AssessmentEngine(ai_client, template_manager)
             self._register_component("assessment_engine", assessment_engine)
 
+            # Initialize rate limit service
+            rate_limit_service = RateLimitService()
+            self._register_component("rate_limit_service", rate_limit_service)
+
+            # Initialize lesson cache
+            lesson_cache = LessonCache()
+            self._register_component("lesson_cache", lesson_cache)
+
+            # Initialize version manager
+            version_manager = VersionManager()
+            self._register_component("version_manager", version_manager)
+
+            # Initialize file watcher (will be started in FastAPI lifespan)
+            file_watcher = FileWatcher()
+            self._register_component("file_watcher", file_watcher)
+
             logger.info("Dependency container initialized successfully")
             self._initialized = True
 
@@ -91,7 +116,13 @@ class DependencyContainer:
     def get_component(self, name: str) -> Any:
         """Get a component from the container."""
         if name not in self._components:
-            raise ValueError(f"Component '{name}' not found in container")
+            raise SystemError(
+                f"Component '{name}' not found in container",
+                details={
+                    "component_name": name,
+                    "available_components": list(self._components.keys()),
+                },
+            )
         return self._components[name]
 
     # Factory methods for components that need database sessions
@@ -111,6 +142,10 @@ class DependencyContainer:
         """Get SessionRepository with async session maker."""
         return AsyncSessionRepository(self._async_session_maker)
 
+    async def get_version_repository(self) -> AsyncLessonVersionRepository:
+        """Get VersionRepository with async session maker."""
+        return AsyncLessonVersionRepository(self._async_session_maker)
+
     async def get_learning_flow_orchestrator(self) -> LearningFlowOrchestrator:
         """Get LearningFlowOrchestrator with repositories."""
         user_repo = await self.get_user_repository()
@@ -123,6 +158,48 @@ class DependencyContainer:
         progress_repo = await self.get_progress_repository()
         return ProgressTracker(progress_repo)
 
+    async def get_lesson_loader_service(self) -> LessonLoaderService:
+        """Get LessonLoaderService with dependencies."""
+        lesson_repo = await self.get_lesson_repository()
+        lesson_cache = self.get_lesson_cache()
+        file_watcher = self.get_file_watcher()
+
+        # Create lesson loader
+        lesson_loader = LessonLoaderService(
+            settings=get_settings(),
+            lesson_repo=lesson_repo,
+            cache=lesson_cache,
+        )
+
+        # Set reload callback on file watcher to use lesson loader
+        def reload_callback(changed_paths: set[Path]) -> None:
+            """Handle file changes by reloading affected lessons."""
+            # Create task to run async reload in background
+            asyncio.create_task(_reload_changed_paths(changed_paths))
+
+        async def _reload_changed_paths(changed_paths: set[Path]) -> None:
+            """Async helper to reload changed paths."""
+            for path in changed_paths:
+                # Extract skill level from path
+                skill_level = path.parent.name
+                await lesson_loader.reload_skill_level(skill_level)
+
+        file_watcher.set_reload_callback(reload_callback)
+
+        return lesson_loader
+
+    def get_lesson_cache(self) -> LessonCache:
+        """Get LessonCache."""
+        return self.get_component("lesson_cache")
+
+    def get_file_watcher(self) -> FileWatcher:
+        """Get FileWatcher."""
+        return self.get_component("file_watcher")
+
+    def get_rate_limit_service(self) -> RateLimitService:
+        """Get RateLimitService."""
+        return self.get_component("rate_limit_service")
+
     async def get_bot_handlers(self) -> "BotHandlers":  # type: ignore
         """Get BotHandlers with all dependencies."""
         # Import here to avoid circular imports
@@ -132,19 +209,25 @@ class DependencyContainer:
         assessment_engine = self.get_component("assessment_engine")
         learning_orchestrator = await self.get_learning_flow_orchestrator()
         progress_tracker = await self.get_progress_tracker()
+        rate_limit_service = self.get_rate_limit_service()
 
         return BotHandlers(
             ai_client=ai_client,
             assessment_engine=assessment_engine,
             learning_orchestrator=learning_orchestrator,
             progress_tracker=progress_tracker,
+            rate_limit_service=rate_limit_service,
         )
 
     async def cleanup(self) -> None:
         """Cleanup resources."""
         logger.info("Cleaning up dependency container")
-        if hasattr(self, "_async_engine"):
-            await self._async_engine.dispose()
+        if hasattr(self, "_async_engine") and self._async_engine is not None:
+            try:
+                await self._async_engine.dispose()
+            except (AttributeError, TypeError):
+                # Handle case where _async_engine is a mock or doesn't have dispose method
+                logger.debug("Async engine does not support dispose or is a mock, skipping")
         self._components.clear()
         self._initialized = False
         logger.info("Dependency container cleaned up")

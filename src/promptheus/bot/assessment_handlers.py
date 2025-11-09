@@ -2,6 +2,7 @@
 
 from loguru import logger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from promptheus.data.models import LearningGoal, SkillLevel
@@ -58,6 +59,13 @@ class AssessmentHandlersMixin:
 
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
+
+        # Update session state to ONBOARDING
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.ONBOARDING, session_context
+        )
 
         logger.debug("Assessment initialized", user_id=user_id, total_questions=len(questions))
 
@@ -132,6 +140,15 @@ class AssessmentHandlersMixin:
         session_context = await self.learning_orchestrator.get_session_context(user_id)
         # context.user_data.update(session_context)  # Removed: using DB session instead
 
+        # Show loading message while evaluating
+        loading_msg = await update.callback_query.message.reply_text(
+            self.formatter.get_typing_indicator_message("evaluating"),
+            parse_mode="Markdown",
+        )
+
+        # Send typing indicator during AI processing
+        await update.callback_query.message.chat.send_action(ChatAction.TYPING)
+
         # Calculate results
         assessment_engine = self.assessment_engine
         answers = session_context.get("assessment_answers", [])
@@ -151,7 +168,7 @@ class AssessmentHandlersMixin:
         ]
 
         try:
-            await update.callback_query.edit_message_text(
+            await loading_msg.edit_text(
                 self.formatter.format_goal_selection(),
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown",
@@ -231,6 +248,13 @@ class AssessmentHandlersMixin:
 
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
+
+        # Update session state to MENU (ready for learning)
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.MENU, session_context
+        )
 
         # Get personalized path
         lessons = await self.learning_orchestrator.get_personalized_path(user_id, skill_level)

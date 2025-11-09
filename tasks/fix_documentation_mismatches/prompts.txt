@@ -8,9 +8,10 @@ save it in a new md document fix-issue-X-X-plan.md in the directory `tasks/fix_d
 ## V2
 Read all documents in the root of the `docs` directory.  
 Analyze the document `tasks/fix_documentation_mismatches/documentation-mismatches.md`.  
-Analyze the current state of the project.  
-Create plan to fix issues 7.1 - 7.2 from the document `tasks/fix_documentation_mismatches/documentation-mismatches.md` based on `docs/project_rules/ai-agent-task-template.md` and  
-save it in a new md document fix-issues-7-plan.md in the directory `tasks/fix_documentation_mismatches`.
+Analyze the current state of the project.
+Create plan to fix issues 9.1 - 9.3 from the document `tasks/fix_documentation_mismatches/documentation-mismatches.md` based on `docs/project_rules/ai-agent-task-template.md` and  
+save it in a new md document fix-issues-9-plan.md in the directory `tasks/fix_documentation_mismatches`.
+Consider rules in `docs/project_rules/development-rules.md`.
 
 
 ========================================================================
@@ -20,3 +21,9 @@ Analyze the current project code.
 Analyze the current set of all project tests.  
 Check whether the plan `tasks/fix_documentation_mismatches/fix-issue-X-X-plan.md` has been completed
 
+========================================================================
+
+Read all documents in the root of the `docs` directory.  
+Analyze the document `tasks/fix_documentation_mismatches/documentation-mismatches.md`.  
+Analyze the current project code.
+Check whether issues 8.1 - 8.2 from the document `tasks/fix_documentation_mismatches/documentation-mismatches.md` have been fixed.

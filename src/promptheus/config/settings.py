@@ -1,9 +1,10 @@
 """Application settings using Pydantic."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,12 +52,23 @@ class Settings(BaseSettings):
         description="Database connection URL",
     )
 
+    # Lessons Content
+    lessons_content_path: Path = Field(
+        default=Path("../promptheus-content/lessons"),
+        description="Path to lessons content directory",
+    )
+
     # Application
     environment: Literal["development", "production"] = Field(
         default="development",
         description="Application environment",
     )
-    log_level: str = Field(default="INFO", description="Logging level")
+
+    @computed_field
+    @property
+    def log_level(self) -> str:
+        """Compute log level based on environment."""
+        return "DEBUG" if self.environment == "development" else "WARNING"
 
     # Rate limiting
     rate_limit_requests: int = Field(default=10, description="Requests per minute per user")
@@ -89,28 +101,92 @@ class Settings(BaseSettings):
         description="Path for webhook endpoint",
     )
 
+    # API Server (for health checks and future admin/user endpoints)
+    api_server_enabled: bool = Field(
+        default=True,
+        description="Enable API server for health checks and future endpoints",
+    )
+    api_server_host: str = Field(
+        default="0.0.0.0",
+        description="Host for API server",
+    )
+    api_server_port: int = Field(
+        default=8080,
+        description="Port for API server",
+    )
+    health_check_timeout_seconds: int = Field(
+        default=5,
+        description="Timeout for health check operations in seconds",
+    )
+
     @field_validator("webhook_url")
     @classmethod
     def validate_webhook_url(cls, v: str | None) -> str | None:
         """Validate that webhook URL uses HTTPS protocol."""
+        from promptheus.core.exceptions import ConfigurationError
+
         if v is not None and not v.startswith("https://"):
-            raise ValueError("webhook_url must use HTTPS protocol")
+            raise ConfigurationError(
+                f"Invalid webhook URL: must use HTTPS protocol, got '{v}'",
+                details={"field": "webhook_url", "value": v, "required_protocol": "https"},
+            )
         return v
 
     @field_validator("webhook_port")
     @classmethod
     def validate_webhook_port(cls, v: int) -> int:
         """Validate that webhook port is one of the allowed values."""
+        from promptheus.core.exceptions import ConfigurationError
+
         allowed_ports = [80, 88, 443, 8443]
         if v not in allowed_ports:
-            raise ValueError(f"webhook_port must be one of {allowed_ports}")
+            raise ConfigurationError(
+                f"Invalid webhook port: must be one of {allowed_ports}, got {v}",
+                details={"field": "webhook_port", "value": v, "allowed_ports": allowed_ports},
+            )
+        return v
+
+    @field_validator("api_server_port")
+    @classmethod
+    def validate_api_server_port(cls, v: int) -> int:
+        """Validate that API server port doesn't conflict with webhook port."""
+        from promptheus.core.exceptions import ConfigurationError
+
+        if v < 1 or v > 65535:
+            raise ConfigurationError(
+                f"Invalid API server port: must be between 1 and 65535, got {v}",
+                details={"field": "api_server_port", "value": v, "valid_range": "1-65535"},
+            )
+        return v
+
+    @field_validator("lessons_content_path")
+    @classmethod
+    def validate_lessons_content_path(cls, v: Path) -> Path:
+        """Validate that lessons content path exists and is a directory."""
+        from promptheus.core.exceptions import ConfigurationError
+
+        if not v.exists():
+            raise ConfigurationError(
+                f"Lessons content path does not exist: {v}",
+                details={"field": "lessons_content_path", "path": str(v), "exists": False},
+            )
+        if not v.is_dir():
+            raise ConfigurationError(
+                f"Lessons content path is not a directory: {v}",
+                details={"field": "lessons_content_path", "path": str(v), "is_directory": False},
+            )
         return v
 
     @model_validator(mode="after")
     def validate_webhook_mode_requirements(self) -> "Settings":
         """Validate that webhook mode has required configuration."""
+        from promptheus.core.exceptions import ConfigurationError
+
         if self.bot_mode == "webhook" and not self.webhook_url:
-            raise ValueError("webhook_url is required when bot_mode is 'webhook'")
+            raise ConfigurationError(
+                "Webhook mode requires webhook_url to be configured",
+                details={"bot_mode": self.bot_mode, "webhook_url": self.webhook_url},
+            )
         return self
 
 

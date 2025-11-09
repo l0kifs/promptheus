@@ -81,7 +81,9 @@ class TestDependencyContainer:
 
     def test_get_component_not_found(self, container):
         """Test getting non-existent component raises ValueError."""
-        with pytest.raises(ValueError, match="Component 'nonexistent' not found"):
+        from promptheus.core.exceptions import SystemError
+
+        with pytest.raises(SystemError, match="Component 'nonexistent' not found"):
             container.get_component("nonexistent")
 
     @pytest.mark.asyncio
@@ -94,8 +96,7 @@ class TestDependencyContainer:
         repo = await container.get_user_repository()
 
         assert isinstance(repo, AsyncUserRepository)
-        assert repo.db is mock_session
-        mock_session_maker.assert_called_once()
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_lesson_repository(self, container, mock_session_maker):
@@ -107,7 +108,7 @@ class TestDependencyContainer:
         repo = await container.get_lesson_repository()
 
         assert isinstance(repo, AsyncLessonRepository)
-        assert repo.db is mock_session
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_progress_repository(self, container, mock_session_maker):
@@ -119,7 +120,7 @@ class TestDependencyContainer:
         repo = await container.get_progress_repository()
 
         assert isinstance(repo, AsyncProgressRepository)
-        assert repo.db is mock_session
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_session_repository(self, container, mock_session_maker):
@@ -131,7 +132,7 @@ class TestDependencyContainer:
         repo = await container.get_session_repository()
 
         assert isinstance(repo, AsyncSessionRepository)
-        assert repo.db is mock_session
+        assert repo.session_maker is mock_session_maker
 
     @pytest.mark.asyncio
     async def test_get_learning_flow_orchestrator(self, container, mock_session_maker):
@@ -168,6 +169,8 @@ class TestDependencyContainer:
         container._async_session_maker = mock_session_maker
         container._register_component("ai_client", mock_ai_client)
         container._register_component("assessment_engine", mock_assessment_engine)
+        mock_rate_limit_service = MagicMock()
+        container._register_component("rate_limit_service", mock_rate_limit_service)
 
         mock_session = AsyncMock()
         mock_session_maker.return_value = mock_session
@@ -186,6 +189,7 @@ class TestDependencyContainer:
             assert call_args[1]["assessment_engine"] is mock_assessment_engine
             assert isinstance(call_args[1]["learning_orchestrator"], LearningFlowOrchestrator)
             assert isinstance(call_args[1]["progress_tracker"], ProgressTracker)
+            assert call_args[1]["rate_limit_service"] is mock_rate_limit_service
 
     @pytest.mark.asyncio
     async def test_cleanup(self, container):

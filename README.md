@@ -76,11 +76,11 @@ cd promptheus
 # Create data directory
 mkdir -p data
 
-# Run migrations (creates tables)
+# Run migrations (creates tables including lesson management)
 alembic upgrade head
 
-# Seed lessons from private repo
-uv run python ../promptheus-content/scripts/seed_lessons.py
+# Note: Lesson content is loaded automatically from JSON files
+# No separate seeding step required after initial migration
 ```
 
 ### 7. Run the Bot
@@ -90,6 +90,64 @@ uv run python -m promptheus.main
 ```
 
 The bot will start and log: `Bot is running. Press Ctrl+C to stop.`
+
+### Docker Setup (Alternative)
+
+For containerized deployment:
+
+#### Prerequisites
+- Docker and Docker Compose installed
+- Same environment variables as above
+
+#### Quick Start with Docker
+
+```bash
+# Clone repositories
+git clone https://github.com/l0kifs/promptheus.git
+cd promptheus
+git clone https://github.com/l0kifs/promptheus-content.git ../promptheus-content
+
+# Create environment file
+cp .env.example .env
+# Edit .env with your credentials
+
+# Start with Docker Compose (development)
+docker compose up --build
+
+# Or for production
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+#### Docker Commands
+
+```bash
+# Development setup
+docker compose up --build          # Start all services
+docker compose up -d --build       # Start in background
+docker compose logs -f             # Follow logs
+docker compose down                # Stop and remove containers
+
+# Production setup
+docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml down
+
+# Health check
+curl http://localhost:8080/health
+
+# Database operations
+docker compose exec promptheus uv run alembic upgrade head
+```
+
+#### Docker Environment Variables
+
+Additional variables for Docker:
+
+| Variable             | Description                    | Default   |
+| -------------------- | ------------------------------ | --------- |
+| `API_SERVER_ENABLED` | Enable health check API server | `true`    |
+| `API_SERVER_HOST`    | API server host                | `0.0.0.0` |
+| `API_SERVER_PORT`    | API server port                | `8080`    |
 
 ### 8. VS Code Workspace (Optional)
 
@@ -126,6 +184,37 @@ This project uses **two repositories** to separate open-source code from proprie
 - [https://github.com/l0kifs/promptheus-content](https://github.com/l0kifs/promptheus-content)
 - Contains: lessons, assessments, exercises, proprietary materials
 
+### Content Management System
+
+Promptheus uses an **organic lesson management system** that automatically loads content from JSON files:
+
+**Key Features:**
+- 📁 **File-based content**: Lessons stored as JSON files in the content repository
+- 🔄 **Hot reload**: Content changes detected automatically (development mode)
+- 📝 **Version control**: Automatic versioning of all content changes
+- ✅ **Validation**: JSON schema validation on load
+- 🚀 **Zero-downtime updates**: Content updates without application restart
+
+**Content Structure:**
+```
+lessons/
+├── beginner/
+│   ├── introduction-to-prompting.json
+│   └── defining-ai-roles.json
+├── intermediate/
+│   └── chain-of-thought-prompting.json
+└── advanced/
+    └── meta-prompting.json
+```
+
+**Workflow:**
+1. Edit JSON files in `promptheus-content/lessons/`
+2. System detects changes automatically
+3. Content reloaded with validation
+4. New versions created for change tracking
+
+See [Content Creation Guide](docs/content-creation-guide.md) for detailed instructions.
+
 ### VS Code Workspace
 
 For the best development experience, use the provided workspace file:
@@ -150,15 +239,28 @@ promptheus/                  # PUBLIC REPO
 │   ├── bot/                 # Telegram bot handlers
 │   ├── core/                # Business logic
 │   ├── config/              # Configuration
-│   └── data/                # Data models & repositories
+│   └── data/                # Data management & repositories
+│       ├── models.py        # SQLAlchemy models
+│       ├── async_repositories.py  # Database access layer
+│       ├── lesson_loader.py # JSON lesson loading
+│       ├── lesson_cache.py  # In-memory caching
+│       ├── file_watcher.py  # Hot reload system
+│       └── version_manager.py # Content versioning
 ├── alembic/                 # Database migrations
-├── scripts/                 # Utility scripts (no content)
+├── scripts/                 # Utility scripts
+│   ├── migrate_from_old_system.py  # One-time migration
+│   └── validate_content.py  # Content validation
 ├── tests/                   # Test suite
 └── docs/                    # Documentation
 
 promptheus-content/          # PRIVATE REPO (separate)
-├── scripts/
-│   └── seed_lessons.py      # Lesson seeding script
+├── lessons/                 # JSON lesson files
+│   ├── beginner/*.json
+│   ├── intermediate/*.json
+│   └── advanced/*.json
+├── docs/                    # Content documentation
+│   ├── lesson-catalog.md
+│   └── content-workflow.md
 └── README.md
 ```
 
@@ -217,6 +319,9 @@ All configuration is done via environment variables in `.env`:
 | `WEBHOOK_SECRET`     | Webhook secret token                    | None                             |
 | `WEBHOOK_PORT`       | Webhook server port                     | 8443                             |
 | `WEBHOOK_PATH`       | Webhook endpoint path                   | `/webhook`                       |
+| `API_SERVER_ENABLED` | Enable health check API server          | `true`                           |
+| `API_SERVER_HOST`    | API server host                         | `0.0.0.0`                        |
+| `API_SERVER_PORT`    | API server port                         | `8080`                           |
 
 See `.env.example` for all available options.
 
@@ -344,7 +449,7 @@ Please read [docs/DS.md](docs/DS.md) for coding standards.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL License - see the [LICENSE](LICENSE) file for details.
 
 ## Documentation
 

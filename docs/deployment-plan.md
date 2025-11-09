@@ -140,12 +140,16 @@ docker compose build
 
 **Step 4: Database Initialization**
 ```bash
-# Apply migrations
+# Apply migrations (includes lesson schema updates)
+# This includes:
+# - Adding slug and position fields to Lesson table
+# - Creating LessonVersion table for version history
+# - Migrating data from order_index to slug/position
 alembic upgrade head
 
-# Seed initial data (lessons) - requires private content repo
-# Clone private repo: git clone https://github.com/l0kifs/promptheus-content.git
-python ../promptheus-content/scripts/seed_lessons.py
+# Note: Lesson content is now loaded automatically from JSON files on startup
+# No separate seeding step required
+# File watcher monitors for content changes and hot reloads automatically
 ```
 
 **Step 5: Application Start**
@@ -159,6 +163,14 @@ docker compose up -d
 # Check status
 docker compose ps
 docker compose logs -f app
+
+# Application startup will:
+# 1. Load configuration (LESSONS_CONTENT_PATH)
+# 2. Initialize lesson cache
+# 3. Load lessons from JSON files (with validation)
+# 4. Populate cache
+# 5. Start file watcher for hot reload
+# 6. Start bot/API services
 ```
 
 **Step 6: Webhook Configuration (Production)**
@@ -179,6 +191,14 @@ pytest tests/ -v --cov
 
 # Integration tests with test bot
 pytest tests/integration/ -v
+
+# Test lesson loading
+# Check logs for "X lessons loaded successfully"
+
+# Test hot reload (in separate terminal)
+# 1. Modify a lesson JSON file
+# 2. Wait 1-2 seconds
+# 3. Check logs for "lesson reloaded" message
 
 # Load testing (optional)
 # locust -f tests/load/locustfile.py
@@ -203,17 +223,32 @@ alembic upgrade head --sql  # Dry-run
 # Pull latest code
 git pull origin main
 
+# Pull latest lesson content (if content repo updated)
+# Note: Content updates don't require application restart
+cd ../promptheus-content
+git pull origin main
+cd ../promptheus
+
 # Rebuild containers (if dependency changes)
 docker compose build
 
-# Apply migrations
+# Apply database migrations (if schema changes)
 docker compose run --rm app alembic upgrade head
 
-# Rolling update
+# Note: Lesson content management
+# - Content loaded automatically from JSON files on startup
+# - File watcher detects changes and reloads content without restart
+# - Version history maintained automatically
+# - Cache updated automatically on content changes
+
+# Rolling update (application code changes)
 docker compose up -d --no-deps --build app
 
 # Check health
 curl https://your-domain.com/health
+
+# Verify lesson cache loaded
+curl https://your-domain.com/admin/cache/stats
 ```
 
 3. **Post-deployment validation**:
@@ -229,43 +264,123 @@ docker compose logs -f --tail=100 app
 
 4. **Rollback procedure** (if issues occur):
 ```bash
-# Rollback to previous version
+# Rollback application code
 git checkout <previous_commit>
 docker compose up -d --no-deps --build app
 
-# Rollback migrations (if needed)
+# Rollback migrations (if schema changes)
 alembic downgrade -1
+
+# Rollback content to previous version (if content issues)
+# Option 1: Via admin API (if specific lesson)
+curl -X POST https://your-domain.com/admin/lessons/{lesson_id}/versions/{version}/activate
+
+# Option 2: Via git (if multiple lessons)
+cd ../promptheus-content
+git checkout <previous_commit>
+# Content will be reloaded automatically via hot reload
 ```
 
-#### 4.4 Database Migrations
+#### 4.4 Lesson Content Management
 
-**Creating a migration**:
-```bash
-# Generate migration
-alembic revision --autogenerate -m "description"
-
-# Check SQL
-alembic upgrade head --sql
-
-# Apply
-alembic upgrade head
+**Content Repository Structure**:
+```
+promptheus-content/
+├── lessons/
+│   ├── beginner/*.json
+│   ├── intermediate/*.json
+│   └── advanced/*.json
+├── docs/
+│   ├── lesson-catalog.md
+│   └── content-workflow.md
+└── README.md
 ```
 
-**Rolling back a migration**:
+**Lesson JSON Structure**:
+```json
+{
+  "title": "Introduction to Prompt Engineering",
+  "skill_level": "beginner",
+  "tags": ["general", "academic"],
+  "theory_content": {
+    "sections": [{"content": "Theory text here"}]
+  },
+  "examples": {
+    "comparisons": [{
+      "bad": "Bad prompt example",
+      "bad_reason": "Why it's bad",
+      "good": "Good prompt example",
+      "good_reason": "Why it's good"
+    }]
+  },
+  "exercises": {
+    "scenarios": [{
+      "scenario": "Context description",
+      "task": "What to do"
+    }]
+  }
+}
+```
+
+**Content Loading & Caching**:
+- **Startup**: All lessons loaded from JSON files and cached in memory
+- **File Watcher**: Monitors lesson directory for changes
+- **Hot Reload**: Content updated automatically within 1-2 seconds of file change
+- **Cache**: In-memory cache provides O(1) lesson lookup
+- **Versioning**: Content changes create version history automatically
+- **Slug Generation**: Automatic URL-safe identifiers from lesson titles
+
+**Content Updates**:
 ```bash
-# Rollback last migration
-alembic downgrade -1
+# Update content (separate from application deployment)
+cd ../promptheus-content
+git pull origin main
+
+# Application detects changes automatically via file watcher
+# No restart required - hot reload activates within 1-2 seconds
+
+# Check logs for content reload confirmation
+docker compose logs -f app | grep "lesson.*reloaded\|version.*created"
+
+# Verify cache updated
+curl https://your-domain.com/admin/cache/stats
+```
+
+**Content Validation**:
+- **Pydantic Schemas**: Validate JSON structure on load
+- **Field Validation**: Required fields, length constraints, enum values
+- **Slug Uniqueness**: Ensure unique slugs within skill level
+- **Content Hash**: SHA-256 hash detects actual changes (ignore formatting)
+- **Version Creation**: Automatic on content change with hash verification
+
+**Content Rollback**:
+```bash
+# List available versions for a lesson
+curl https://your-domain.com/admin/lessons/{lesson_id}/versions
+
+# Compare two versions
+curl "https://your-domain.com/admin/lessons/{lesson_id}/versions/compare?v1=1.0.0&v2=2.0.0"
 
 # Rollback to specific version
-alembic downgrade <revision>
+curl -X POST https://your-domain.com/admin/lessons/{lesson_id}/versions/1.0.0/activate
+
+# Content immediately updated in cache and served to users
 ```
 
-**Best practices**:
-- Test migrations locally with production-like data before deployment
-- Backup database before migrations
-- Reversible migrations (downgrade support)
-- Don't drop columns in same migration as creation (two-phase)
-- Validate migrations with `--sql` flag before applying
+**Cache Management**:
+```bash
+# View cache statistics
+curl https://your-domain.com/admin/cache/stats
+# Returns: hit_rate, size, reload_count, last_reload
+
+# Manual cache invalidation (force reload from database)
+curl -X POST https://your-domain.com/admin/cache/invalidate
+
+# Cache is also updated automatically on:
+# - Application startup (loads all lessons)
+# - File changes (hot reload)
+# - Version rollback (via admin API)
+```
 
 ### 5. Monitoring and System Health
 
@@ -279,7 +394,14 @@ alembic downgrade <revision>
   "database": "connected",
   "telegram_api": "reachable",
   "openrouter_api": "reachable",
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "cache": {
+    "size": 15,
+    "hit_rate": 0.95,
+    "reload_count": 3,
+    "last_reload": "2025-11-09T12:34:56Z"
+  },
+  "file_watcher": "active"
 }
 ```
 
@@ -502,11 +624,14 @@ pg_restore -h <host> -U <user> -d promptheus backup_20251101.dump
 - [ ] Code review completed and approved
 - [ ] Database migrations tested locally with production-like data
 - [ ] Manual testing completed with test bot
+- [ ] Lesson content validated (all JSON files pass schema validation)
+- [ ] Hot reload tested locally (modify lesson, verify reload)
 - [ ] Environment variables configured in production secrets manager
+- [ ] LESSONS_CONTENT_PATH configured correctly
 - [ ] Secrets rotated (if needed)
 - [ ] Database backup created
 - [ ] Monitoring alerts configured
-- [ ] Rollback plan documented
+- [ ] Rollback plan documented (application + content + database)
 
 #### 10.2 Deployment
 - [ ] Deploy to production (with manual approval)
@@ -518,9 +643,14 @@ pg_restore -h <host> -U <user> -d promptheus backup_20251101.dump
 
 #### 10.3 Post-deployment (Production Validation)
 - [ ] Smoke tests completed (core user flows)
+- [ ] Lesson cache loaded (check /admin/cache/stats)
+- [ ] File watcher active (check logs and /health endpoint)
+- [ ] Lessons accessible via bot (test with /start)
 - [ ] Metrics normal (error rate < 1%, latency acceptable)
+- [ ] Cache hit rate > 90% after warmup
 - [ ] No rollback triggered
 - [ ] Monitor for 15-30 minutes
+- [ ] Test hot reload (if applicable): modify lesson, verify update
 - [ ] Team notified of successful deployment
 - [ ] Documentation updated (if configuration changes)
 
@@ -529,11 +659,13 @@ pg_restore -h <host> -U <user> -d promptheus backup_20251101.dump
 #### 11.1 Common Issues
 
 **Bot not responding**:
-1. Check health check endpoint
+1. Check health check endpoint (includes cache and file watcher status)
 2. Check Docker container status: `docker compose ps`
 3. Check logs: `docker compose logs -f app`
 4. Check webhook: `getWebhookInfo` API call
 5. Check firewall rules
+6. Check LESSONS_CONTENT_PATH is accessible
+7. Verify lesson cache loaded: `GET /admin/cache/stats`
 
 **Database connection errors**:
 1. Check DATABASE_URL
@@ -554,7 +686,9 @@ pg_restore -h <host> -U <user> -d promptheus backup_20251101.dump
 2. Check OpenRouter API latency
 3. Check CPU/Memory utilization
 4. Check network latency
-5. Consider caching for frequently accessed data
+5. Check cache hit rate (should be >90%): `GET /admin/cache/stats`
+6. Consider invalidating and reloading cache: `POST /admin/cache/invalidate`
+7. Check for hot reload issues in logs
 
 #### 11.2 Contacts and Escalation
 

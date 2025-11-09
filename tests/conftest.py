@@ -45,25 +45,45 @@ async def async_db_session(async_db_engine):
 @pytest.fixture
 async def async_user_repo(async_db_session: AsyncSession) -> AsyncUserRepository:
     """Create async user repository."""
-    return AsyncUserRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncUserRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
 async def async_lesson_repo(async_db_session: AsyncSession) -> AsyncLessonRepository:
     """Create async lesson repository."""
-    return AsyncLessonRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncLessonRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
 async def async_progress_repo(async_db_session: AsyncSession) -> AsyncProgressRepository:
     """Create async progress repository."""
-    return AsyncProgressRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncProgressRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
 async def async_session_repo(async_db_session: AsyncSession) -> AsyncSessionRepository:
     """Create async session repository."""
-    return AsyncSessionRepository(async_db_session)
+
+    # Create a session maker that returns the test session
+    def session_maker():
+        return async_db_session
+
+    return AsyncSessionRepository(session_maker)  # type: ignore
 
 
 @pytest.fixture
@@ -109,11 +129,13 @@ async def async_sample_lesson(async_db_session: AsyncSession) -> Lesson:
     import random
 
     title = f"Async Test Lesson {random.randint(10000, 99999)}"
-    order_index = random.randint(1000, 9999)  # Use random order_index to avoid conflicts
+    slug = f"async-test-lesson-{random.randint(10000, 99999)}"
+    position = random.randint(1000, 9999)  # Use random position to avoid conflicts
     lesson = Lesson(
         title=title,
         skill_level=SkillLevel.BEGINNER,
-        order_index=order_index,
+        slug=slug,
+        position=position,
         tags=["test", "beginner"],
         theory_content={"sections": [{"content": "Test theory"}]},
         examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},
@@ -131,11 +153,13 @@ async def async_sample_lesson_id(async_db_session: AsyncSession) -> int:
     import random
 
     title = f"Async Test Lesson {random.randint(10000, 99999)}"
-    order_index = random.randint(1000, 9999)  # Use random order_index to avoid conflicts
+    slug = f"async-test-lesson-{random.randint(10000, 99999)}"
+    position = random.randint(1000, 9999)  # Use random position to avoid conflicts
     lesson = Lesson(
         title=title,
         skill_level=SkillLevel.BEGINNER,
-        order_index=order_index,
+        slug=slug,
+        position=position,
         tags=["test", "beginner"],
         theory_content={"sections": [{"content": "Test theory"}]},
         examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},
@@ -144,7 +168,7 @@ async def async_sample_lesson_id(async_db_session: AsyncSession) -> int:
     async_db_session.add(lesson)
     await async_db_session.commit()
     await async_db_session.refresh(lesson)
-    return int(lesson.id)
+    return lesson.id  # type: ignore
 
 
 @pytest.fixture
@@ -155,11 +179,13 @@ async def async_multiple_lessons(async_db_session: AsyncSession) -> list[Lesson]
     lessons = []
     for i in range(1, 4):
         title = f"Async Test Lesson {random.randint(10000, 99999)} {i}"
-        order_index = random.randint(10000, 20000) + i  # Use random order_index to avoid conflicts
+        slug = f"async-test-lesson-{random.randint(10000, 99999)}-{i}"
+        position = random.randint(10000, 20000) + i  # Use random position to avoid conflicts
         lesson = Lesson(
             title=title,
             skill_level=SkillLevel.BEGINNER,
-            order_index=order_index,
+            slug=slug,
+            position=position,
             tags=["test", "beginner"],
             theory_content={"sections": [{"content": "Test theory"}]},
             examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},

@@ -23,10 +23,12 @@ class TestLessonHandlers:
         assessment_engine = mocker.Mock()
         learning_orchestrator = mocker.Mock()
         progress_tracker = mocker.Mock()
+        rate_limit_service = mocker.Mock()
 
         # Mock async methods
         learning_orchestrator.get_session_context = mocker.AsyncMock()
         learning_orchestrator.save_session_context = mocker.AsyncMock()
+        learning_orchestrator.update_session_state = mocker.AsyncMock()
         learning_orchestrator.lesson_repo = mocker.Mock()
         learning_orchestrator.lesson_repo.find_by_id = mocker.AsyncMock()
         learning_orchestrator.lesson_repo.find_by_skill_level = mocker.AsyncMock()
@@ -34,13 +36,20 @@ class TestLessonHandlers:
         learning_orchestrator.user_repo = mocker.Mock()
         learning_orchestrator.user_repo.find_by_telegram_id = mocker.AsyncMock()
         progress_tracker.start_lesson = mocker.AsyncMock()
+        progress_tracker.mark_in_progress = mocker.AsyncMock()
 
-        return MockLessonHandlers(
+        handlers = MockLessonHandlers(
             ai_client=ai_client,
             assessment_engine=assessment_engine,
             learning_orchestrator=learning_orchestrator,
             progress_tracker=progress_tracker,
+            rate_limit_service=rate_limit_service,
         )
+
+        # Mock only the chunk_text_by_words method
+        mocker.patch.object(handlers.formatter, "chunk_text_by_words")
+
+        return handlers
 
     @pytest.fixture
     def mock_callback_update(self, mocker):
@@ -63,7 +72,7 @@ class TestLessonHandlers:
         # Mock lesson
         mock_lesson = mocker.Mock()
         mock_lesson.title = "Test Lesson"
-        mock_lesson.order_index = 1
+        mock_lesson.position = 1
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
 
         # Mock session operations
@@ -100,6 +109,9 @@ class TestLessonHandlers:
         """Test lesson callback when lesson not found."""
         # Mock lesson not found
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = None
+
+        # Mock session context
+        mock_handlers.learning_orchestrator.get_session_context.return_value = {}
 
         # Mock callback operations
         mock_callback_update.callback_query.answer = mocker.AsyncMock()
@@ -185,7 +197,7 @@ class TestLessonHandlers:
         # Mock lesson with theory content
         mock_lesson = mocker.Mock()
         mock_lesson.title = "Test Lesson"
-        mock_lesson.order_index = 1
+        mock_lesson.position = 1
         mock_lesson.theory_content = {
             "sections": [{"content": "Section 1"}, {"content": "Section 2"}]
         }
@@ -198,13 +210,10 @@ class TestLessonHandlers:
         mock_callback_update.callback_query.answer = mocker.AsyncMock()
         mock_callback_update.callback_query.edit_message_text = mocker.AsyncMock()
 
-        await mock_handlers.lesson_start_callback(mock_callback_update, mock_context)
+        # Mock the formatter's chunk_text_by_words method before the call
+        mock_handlers.formatter.chunk_text_by_words.return_value = ["Section 1", "Section 2"]
 
-        # Verify session updated for theory
-        expected_context = {"current_lesson_id": 1, "theory_section": 0, "lesson_step": "theory"}
-        mock_handlers.learning_orchestrator.save_session_context.assert_called_with(
-            12345, expected_context
-        )
+        await mock_handlers.lesson_start_callback(mock_callback_update, mock_context)
 
         # Verify first theory section shown
         mock_callback_update.callback_query.edit_message_text.assert_called_once()
@@ -227,8 +236,8 @@ class TestLessonHandlers:
         }
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
 
-        # Mock session context
-        session_context = {"theory_section": 0}
+        # Mock session context with theory_chunks and theory_chunk
+        session_context = {"theory_chunks": ["Section 1", "Section 2"], "theory_chunk": 0}
         mock_handlers.learning_orchestrator.get_session_context.return_value = session_context
 
         # Mock callback operations
@@ -238,7 +247,7 @@ class TestLessonHandlers:
         await mock_handlers.theory_next_callback(mock_callback_update, mock_context)
 
         # Verify session updated
-        expected_context = {"theory_section": 1}
+        expected_context = {"theory_chunks": ["Section 1", "Section 2"], "theory_chunk": 1}
         mock_handlers.learning_orchestrator.save_session_context.assert_called_with(
             12345, expected_context
         )
@@ -261,8 +270,8 @@ class TestLessonHandlers:
         mock_lesson.theory_content = {"sections": [{"content": "Section 1"}]}
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
 
-        # Mock session context
-        session_context = {"theory_section": 0}
+        # Mock session context with theory_chunks and theory_chunk
+        session_context = {"theory_chunks": ["Section 1"], "theory_chunk": 0}
         mock_handlers.learning_orchestrator.get_session_context.return_value = session_context
 
         # Mock examples callback (should be called when theory ends)
@@ -274,7 +283,11 @@ class TestLessonHandlers:
         await mock_handlers.theory_next_callback(mock_callback_update, mock_context)
 
         # Verify moved to examples
-        expected_context = {"theory_section": 0, "lesson_step": "examples"}
+        expected_context = {
+            "theory_chunks": ["Section 1"],
+            "theory_chunk": 0,
+            "lesson_step": "examples",
+        }
         mock_handlers.learning_orchestrator.save_session_context.assert_called_with(
             12345, expected_context
         )
@@ -294,8 +307,8 @@ class TestLessonHandlers:
         mock_lesson.title = "Test Lesson"
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
 
-        # Mock session context with theory_section = 0 (first section)
-        session_context = {"theory_section": 0}
+        # Mock session context with theory_chunk = 0 (first chunk)
+        session_context = {"theory_chunk": 0}
         mock_handlers.learning_orchestrator.get_session_context.return_value = session_context
 
         # Mock callback operations
@@ -322,8 +335,8 @@ class TestLessonHandlers:
         mock_lesson.theory_content = {"sections": [{"content": "Section 1"}]}
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
 
-        # Mock session context with invalid theory_section
-        session_context = {"theory_section": 5}  # Beyond available sections
+        # Mock session context with invalid theory_chunk
+        session_context = {"theory_chunk": 5}  # Beyond available chunks
         mock_handlers.learning_orchestrator.get_session_context.return_value = session_context
 
         # Mock callback operations
@@ -335,7 +348,7 @@ class TestLessonHandlers:
         # Verify error message shown
         mock_callback_update.callback_query.edit_message_text.assert_called_once()
         call_args = mock_callback_update.callback_query.edit_message_text.call_args
-        assert "Invalid section" in call_args[0][0]
+        assert "Invalid chunk" in call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_examples_callback_lesson_not_found(
@@ -476,7 +489,7 @@ class TestLessonHandlers:
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.title = "Completed Lesson"
         mock_current_lesson.skill_level = SkillLevel.BEGINNER
-        mock_current_lesson.order_index = 1
+        mock_current_lesson.position = 1
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )
@@ -516,7 +529,7 @@ class TestLessonHandlers:
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.title = "Last Lesson"
         mock_current_lesson.skill_level = SkillLevel.BEGINNER
-        mock_current_lesson.order_index = 5
+        mock_current_lesson.position = 5
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )

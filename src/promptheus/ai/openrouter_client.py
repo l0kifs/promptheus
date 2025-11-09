@@ -79,6 +79,19 @@ class OpenRouterClient:
 
         raise RuntimeError("All AI models failed")
 
+    async def test_connection(self) -> bool:
+        """Test connection to OpenRouter API without consuming credits."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                # Use models endpoint which is free and doesn't require credits
+                response = await client.get(
+                    f"{self.base_url}/models", headers=self.headers, timeout=5.0
+                )
+                return response.status_code == 200
+        except Exception as e:
+            logger.error(f"OpenRouter connection test failed: {e}")
+            return False
+
     async def evaluate_prompt(self, user_prompt: str, scenario: str) -> dict[str, Any]:
         """Evaluate user's prompt."""
         evaluation_prompt = f"""You are an expert in prompt engineering. Evaluate this user's prompt.

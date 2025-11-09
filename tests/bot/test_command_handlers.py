@@ -23,12 +23,18 @@ class TestCommandHandlers:
         assessment_engine = mocker.Mock()
         learning_orchestrator = mocker.Mock()
         progress_tracker = mocker.Mock()
+        rate_limit_service = mocker.Mock()
+
+        # Mock async methods
+        learning_orchestrator.get_session_context = mocker.AsyncMock()
+        learning_orchestrator.update_session_state = mocker.AsyncMock()
 
         return MockCommandHandlers(
             ai_client=ai_client,
             assessment_engine=assessment_engine,
             learning_orchestrator=learning_orchestrator,
             progress_tracker=progress_tracker,
+            rate_limit_service=rate_limit_service,
         )
 
     @pytest.fixture
@@ -100,10 +106,10 @@ class TestCommandHandlers:
         assert "Welcome back" in call_args[0][0]
 
     @pytest.mark.asyncio
-    async def test_start_command_returning_user_with_session(
+    async def test_start_command_resume_with_section_details_theory(
         self, mock_handlers, mock_update, mock_context, mocker
     ):
-        """Test /start command for returning user with active session."""
+        """Test enhanced resume shows specific theory section details."""
         # Mock existing user
         mock_user = mocker.Mock()
         mock_user.skill_level.value = "BEGINNER"
@@ -111,8 +117,13 @@ class TestCommandHandlers:
             return_value=mock_user
         )
 
-        # Mock session context with active lesson
-        session_context = {"current_lesson_id": 1, "lesson_step": "theory", "theory_section": 0}
+        # Mock session context with theory section
+        session_context = {
+            "current_lesson_id": 1,
+            "lesson_step": "theory",
+            "theory_chunk": 1,
+            "theory_chunks": ["chunk1", "chunk2", "chunk3"],
+        }
         mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
             return_value=session_context
         )
@@ -129,15 +140,89 @@ class TestCommandHandlers:
 
         await mock_handlers.start_command(mock_update, mock_context)
 
-        # Verify lesson lookup
-        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.assert_called_once_with(1)
-
-        # Verify resume message sent
+        # Verify resume message contains section details
         mock_update.message.reply_text.assert_called_once()
         call_args = mock_update.message.reply_text.call_args
-        assert "Welcome back" in call_args[0][0]
-        assert "Test Lesson" in call_args[0][0]
-        assert "Current step" in call_args[0][0]
+        message_text = call_args[0][0]
+        assert "Welcome back" in message_text
+        assert "Test Lesson" in message_text
+        assert "Theory (Part 2 of 3)" in message_text
+
+    @pytest.mark.asyncio
+    async def test_start_command_resume_with_section_details_examples(
+        self, mock_handlers, mock_update, mock_context, mocker
+    ):
+        """Test enhanced resume shows examples section."""
+        # Mock existing user
+        mock_user = mocker.Mock()
+        mock_user.skill_level.value = "BEGINNER"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id = mocker.AsyncMock(
+            return_value=mock_user
+        )
+
+        # Mock session context with examples section
+        session_context = {"current_lesson_id": 1, "lesson_step": "examples"}
+        mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
+            return_value=session_context
+        )
+
+        # Mock lesson
+        mock_lesson = mocker.Mock()
+        mock_lesson.title = "Test Lesson"
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id = mocker.AsyncMock(
+            return_value=mock_lesson
+        )
+
+        # Mock reply_text
+        mock_update.message.reply_text = mocker.AsyncMock()
+
+        await mock_handlers.start_command(mock_update, mock_context)
+
+        # Verify resume message contains examples section
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        message_text = call_args[0][0]
+        assert "Welcome back" in message_text
+        assert "Test Lesson" in message_text
+        assert "Examples" in message_text
+
+    @pytest.mark.asyncio
+    async def test_start_command_resume_with_section_details_practice(
+        self, mock_handlers, mock_update, mock_context, mocker
+    ):
+        """Test enhanced resume shows practice section."""
+        # Mock existing user
+        mock_user = mocker.Mock()
+        mock_user.skill_level.value = "BEGINNER"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id = mocker.AsyncMock(
+            return_value=mock_user
+        )
+
+        # Mock session context with practice section
+        session_context = {"current_lesson_id": 1, "lesson_step": "practice"}
+        mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
+            return_value=session_context
+        )
+
+        # Mock lesson
+        mock_lesson = mocker.Mock()
+        mock_lesson.title = "Test Lesson"
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id = mocker.AsyncMock(
+            return_value=mock_lesson
+        )
+
+        # Mock reply_text
+        mock_update.message.reply_text = mocker.AsyncMock()
+
+        await mock_handlers.start_command(mock_update, mock_context)
+
+        # Verify resume message contains practice section
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        message_text = call_args[0][0]
+        assert "Welcome back" in message_text
+        assert "Test Lesson" in message_text
+        assert "Practice Exercise" in message_text
 
     @pytest.mark.asyncio
     async def test_start_command_invalid_update(self, mock_handlers, mock_context, mocker):

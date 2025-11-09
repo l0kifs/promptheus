@@ -38,11 +38,21 @@ class CommandHandlersMixin:
 
                 if lesson:
                     resume_text = f"👋 Welcome back!\n\nYou were learning:\n**{lesson.title}**\n\n"
-                    resume_text += f"Current step: {lesson_step.title()}"
 
+                    # Show detailed section information
                     if lesson_step == "theory":
-                        theory_section = session_context.get("theory_section", 0)
-                        resume_text += f" (Section {theory_section + 1})"
+                        theory_chunk = session_context.get("theory_chunk", 0)
+                        total_chunks = len(session_context.get("theory_chunks", []))
+                        if total_chunks > 0:
+                            resume_text += f"📖 Current section: Theory (Part {theory_chunk + 1} of {total_chunks})"
+                        else:
+                            resume_text += "📖 Current section: Theory"
+                    elif lesson_step == "examples":
+                        resume_text += "📊 Current section: Examples"
+                    elif lesson_step == "practice":
+                        resume_text += "✏️ Current section: Practice Exercise"
+                    else:
+                        resume_text += f"Current step: {lesson_step.title()}"
 
                     keyboard = [
                         [InlineKeyboardButton("▶️ Continue", callback_data="continue")],
@@ -97,6 +107,16 @@ class CommandHandlersMixin:
             return
 
         await update.callback_query.answer()
+
+        user_id = update.effective_user.id
+
+        # Update session state to MENU
+        session_context = await self.learning_orchestrator.get_session_context(user_id)
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.MENU, session_context
+        )
 
         keyboard = [
             [InlineKeyboardButton("📖 Continue Learning", callback_data="continue")],

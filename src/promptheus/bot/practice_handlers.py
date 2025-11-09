@@ -2,6 +2,7 @@
 
 from loguru import logger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 
@@ -53,10 +54,17 @@ class PracticeHandlersMixin:
         # Save session context
         await self.learning_orchestrator.save_session_context(user_id, session_context)
 
+        # Update session state to PRACTICING
+        from promptheus.data.models import SessionState
+
+        await self.learning_orchestrator.update_session_state(
+            user_id, SessionState.PRACTICING, session_context
+        )
+
         keyboard = [
             [InlineKeyboardButton("💡 Show Hint", callback_data=f"hint_{lesson_id}")],
             [InlineKeyboardButton("⏭️ Skip Exercise", callback_data=f"skip_{lesson_id}")],
-            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
+            [InlineKeyboardButton("⬅️ Back to Examples", callback_data=f"examples_{lesson_id}")],
         ]
 
         practice_text = "✏️ *Practice Exercise*\n\n"
@@ -141,7 +149,7 @@ class PracticeHandlersMixin:
         if current_lesson:
             next_lesson = await self.learning_orchestrator.lesson_repo.find_next_lesson(
                 current_lesson.skill_level,  # type: ignore
-                current_lesson.order_index,  # type: ignore
+                current_lesson.position,  # type: ignore
             )
 
             if next_lesson:
@@ -250,6 +258,9 @@ class PracticeHandlersMixin:
             parse_mode="Markdown",
         )
 
+        # Send typing indicator during AI processing
+        await update.message.chat.send_action(ChatAction.TYPING)
+
         try:
             # Get lesson to extract exercise context
             lesson = await self.learning_orchestrator.lesson_repo.find_by_id(lesson_id)
@@ -353,7 +364,9 @@ class PracticeHandlersMixin:
                 keyboard.append(
                     [InlineKeyboardButton("🔄 Try Again", callback_data=f"practice_{lesson_id}")]
                 )
-            keyboard.append([InlineKeyboardButton("📚 Back to Menu", callback_data="menu")])
+            keyboard.append(
+                [InlineKeyboardButton("⬅️ Back to Examples", callback_data=f"examples_{lesson_id}")]
+            )
 
             # Edit loading message with feedback
             await loading_msg.edit_text(

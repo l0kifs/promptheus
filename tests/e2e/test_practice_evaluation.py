@@ -3,7 +3,7 @@
 import pytest
 from telegram import Update
 
-from promptheus.data.models import SkillLevel
+from promptheus.data.models import SkillLevel, LearningGoal
 
 
 class TestPracticeEvaluationE2E:
@@ -46,7 +46,7 @@ class TestPracticeEvaluationE2E:
         bot_handlers.progress_tracker.progress_repo = mock_progress_repo
 
         # Mock existing user
-        mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
+        mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER, "learning_goal": LearningGoal.ACADEMIC})()
         mock_user_repo.find_by_telegram_id.return_value = mock_user
 
         # Mock lesson with exercises

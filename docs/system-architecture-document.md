@@ -90,8 +90,10 @@
 **Components**:
 - **OpenRouter Client**: HTTP client with retry logic, fallback chain, rate limiting
 - **Prompt Template Manager**: Stores and renders prompt templates for different scenarios
+  - Exercise feedback template includes scenario + task for alignment validation
 - **Response Parser**: Extracts structured data from AI responses, validates format
 - **Model Selector**: Implements fallback chain (Llama-4-Scout → Gemini-2.5-Pro → Mistral-Small)
+- **Task-Prompt Alignment Validator**: AI-powered validation that user's prompt addresses the exercise task
 
 **Key Interactions**:
 - Receives AI operation requests from Application Core

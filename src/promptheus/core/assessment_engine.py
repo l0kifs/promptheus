@@ -284,6 +284,8 @@ class AssessmentEngine:
         self,
         user_prompt: str,
         lesson_id: int,
+        exercise_scenario: str = "",
+        exercise_task: str = "",
         skill_level: str = "beginner",
         learning_goal: str = "general",
     ) -> dict[str, int | list[str]]:
@@ -292,16 +294,22 @@ class AssessmentEngine:
         Args:
             user_prompt: The prompt submitted by the user
             lesson_id: The ID of the current lesson
+            exercise_scenario: The exercise scenario/context from the lesson
+            exercise_task: The specific task the user should complete
+            skill_level: User's current skill level
+            learning_goal: User's learning goal
 
         Returns:
             Dictionary with score (0-10), strengths, and improvements
         """
         logger.info("Evaluating user prompt", lesson_id=lesson_id, prompt_length=len(user_prompt))
 
-        # Create evaluation prompt using template manager
+        # Create evaluation prompt using template manager with exercise context
         evaluation_prompt = self.template_manager.render(
             "exercise_feedback",
             user_prompt=user_prompt,
+            exercise_scenario=exercise_scenario,
+            exercise_task=exercise_task,
             skill_level=skill_level,
             learning_goal=learning_goal,
         )

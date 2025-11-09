@@ -357,8 +357,17 @@ class LessonHandlersMixin:
 
         await update.callback_query.answer()
 
-        # Extract lesson ID
-        lesson_id = int(update.callback_query.data.split("_")[1])  # type: ignore
+        # Extract lesson ID - handle both "examples_{id}" and "theory_next_{id}" formats
+        data_parts = update.callback_query.data.split("_")
+        if data_parts[0] == "examples":
+            lesson_id = int(data_parts[1])  # type: ignore
+        elif data_parts[0] == "theory" and data_parts[1] == "next":
+            lesson_id = int(data_parts[2])  # type: ignore
+        else:
+            await update.callback_query.edit_message_text(
+                self.formatter.format_error("Invalid callback data")
+            )
+            return
 
         lesson = await self.learning_orchestrator.lesson_repo.find_by_id(lesson_id)
 

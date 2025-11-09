@@ -18,7 +18,7 @@
 - Theory: 50-80 words per message
 - Examples: 2-3 sentences (150-200 chars)
 - Exercises: Max 100 words
-- Feedback: Single comprehensive message
+- Feedback: 2-3 structured messages
 
 **Typography**:
 ```
@@ -111,13 +111,6 @@ B) Персона для AI (например, "учитель")
 C) Формат ответа
 
 [A] [B] [C]
-```
-
-**Step 3.5: Assessment Analysis**
-```
-⏳ Evaluating your knowledge...
-
-[AI analyzes responses and calculates skill level]
 ```
 
 **Step 4: Goal Selection**
@@ -223,30 +216,57 @@ AI подстраивает стиль, лексику и глубину
 ⏳ Анализирую ваш промпт...
 ```
 
-**AI Feedback** (single comprehensive message)
+**AI Feedback** (structured)
 ```
-📝 *Your Prompt:*
+📝 Ваш промпт:
 "Дай совет по питанию для спорта"
 
-🔍 *Score:* 4/10
+🔍 Оценка: 4/10
 
-❌ *What needs improvement:*
-• Missing specialist role
-• Not specific enough (sport type, goal)
+❌ Что не хватает:
+• Роли специалиста
+• Конкретики (вид спорта, цель)
 
-✅ *Strengths:*
-• Clear request structure
+[Посмотреть улучшенный ➡️]
+```
 
-💡 *Suggestions for improvement:*
-• Add a specific role (e.g., "sports nutritionist")
-• Include more context about the sport and goals
-• Specify output format
+**AI Feedback for Misaligned Prompt** (task mismatch)
+```
+📝 Ваш промпт:
+"Проанализируй мое бизнес-решение..."
 
-✨ *Improved version example:*
+🔍 Оценка: 2/10
 
-"Ты — спортивный диетолог с 15-летним опытом. Составь план питания для начинающего бегуна, цель — похудение. Укажи калории и время приемов пищи."
+⚠️ Несоответствие задаче:
+• Задание требует цепочку из 4 промптов
+  для контент-маркетинга
+• Ваш промпт решает другую задачу
+  (анализ бизнес-решения)
 
-[🔄 Try Again]  [✅ Lesson Complete]
+💡 Совет:
+Создайте 4 связанных промпта:
+1. Исследование темы
+2. Генерация заголовков
+3. Создание структуры
+4. Первый черновик
+
+[🔄 Попробовать еще]
+```
+
+```
+✅ Улучшенная версия:
+
+"Ты — спортивный диетолог с 15-летним
+опытом. Составь план питания для
+начинающего бегуна, цель — похудение.
+Укажи калории и время приемов пищи."
+
+Добавлено:
+• Роль: спортивный диетолог
+• Контекст: начинающий бегун, похудение
+• Формат: план с калориями и временем
+
+[🔄 Попробовать еще]  [✅ Урок завершен]
 ```
 
 **Lesson Completion**

@@ -114,20 +114,28 @@
 #### 4.2 Lesson
 ```
 - id (PK)
-- title
+- title (unique)
+- slug (unique per skill_level, generated from title)
 - skill_level (enum: beginner/intermediate/advanced)
-- order_index
+- position (integer, nullable, for explicit ordering)
 - tags (JSON array: ["technique", "use_case", "topic"])
 - theory_content (JSON)
 - examples (JSON)
 - exercises (JSON)
-- created_at
+- version (string, semantic version)
+- created_at, updated_at
 ```
 
 **Tag Categories:**
 - **Techniques**: `zero-shot`, `few-shot`, `role-based`, `chain-of-thought`, `context-heavy`, `formatting`
 - **Use Cases**: `academic`, `professional`, `creative`, `general`
 - **Topics**: `role-definition`, `context-provision`, `clear-objectives`, `output-formatting`, `iterative-refinement`, `error-detection`
+
+**Lesson Identification:**
+- Lessons identified by `slug` (URL-safe, semantic identifier)
+- Example: "Introduction to Prompt Engineering" → "introduction-to-prompt-engineering"
+- Ordering determined by `position` field or alphabetical by filename
+- Slugs generated automatically from titles during content loading
 
 #### 4.3 UserProgress
 ```
@@ -148,11 +156,33 @@
 - updated_at
 ```
 
-#### 4.5 Data Access Patterns
+#### 4.5 LessonVersion
+```
+- id (PK)
+- lesson_id (FK)
+- version (semantic version string, e.g., "1.2.3")
+- content_hash (SHA-256 hash of content)
+- theory_content (JSON, snapshot)
+- examples (JSON, snapshot)
+- exercises (JSON, snapshot)
+- created_at
+- created_by (system/user identifier)
+- change_description (optional)
+- is_active (boolean, only one active per lesson)
+```
+
+**Versioning:**
+- Automatic version creation on content changes
+- Content hash detects actual changes (ignore formatting)
+- Version history enables rollback capability
+- Only one active version per lesson at a time
+
+#### 4.6 Data Access Patterns
 - **Repository Pattern**: Async repositories with session management
 - **Dependency Injection**: Constructor injection for all components
 - **Session Management**: Async session makers with proper lifecycle
 - **Transaction Handling**: Async context managers for database operations
+- **Caching Layer**: In-memory cache for lesson content with hot reload
 
 ### 5. API Integrations
 
@@ -188,7 +218,16 @@
 - AI-powered feedback on user prompts
 - Progress tracking and resume capability
 
-#### 6.2 Excluded from MVP
+#### 6.2 Lesson Management Features (Included)
+- **Content Loading**: Automatic loading from JSON files on startup
+- **Validation**: Pydantic schemas validate all lesson content structure
+- **Slug Generation**: Automatic URL-safe identifiers from lesson titles
+- **Caching**: In-memory cache for fast lesson retrieval (O(1) lookup)
+- **Hot Reload**: File watcher detects changes and updates content without restart
+- **Versioning**: Track content changes with version history
+- **Rollback**: Ability to revert to previous lesson versions
+
+#### 6.3 Excluded from MVP
 - Advanced techniques (chain-of-thought, meta-prompting)
 - Community features
 - Multi-language support
@@ -203,6 +242,9 @@ TELEGRAM_BOT_TOKEN
 OPENROUTER_API_KEY
 DATABASE_URL
 LOG_LEVEL
+
+# Lesson Content Management
+LESSONS_CONTENT_PATH=/path/to/promptheus-content/lessons  # Path to lesson JSON files
 
 # AI Model Configuration (Free Tier)
 AI_MODEL_PRIMARY=meta-llama/llama-4-scout:free
@@ -313,6 +355,8 @@ python-dotenv>=1.0
 httpx>=0.27  # Modern async HTTP client
 loguru>=0.7  # Simplified logging with better defaults
 aiosqlite>=0.19  # Async SQLite driver
+watchfiles>=0.21  # File system monitoring for hot reload
+semver>=3.0  # Semantic versioning for content versions
 ```
 
 #### 12.2 Development Dependencies

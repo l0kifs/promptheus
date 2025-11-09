@@ -19,21 +19,37 @@
 │                   Application Core Layer                    │
 │  • Learning Flow Orchestrator  • Content Delivery Manager   │
 │  • Assessment Engine           • Progress Tracker           │
-└─────────────┬──────────────────────────────┬────────────────┘
-              │                              │
-    ┌─────────▼──────────┐         ┌─────────▼──────────┐
-    │   AI Integration   │         │   Data Access      │
-    │       Layer        │         │      Layer         │
-    │  • OpenRouter      │         │  • User Repository │
-    │    Client          │         │  • Lesson Repo     │
-    │  • Prompt Manager  │         │  • Progress Repo   │
-    │  • Response Parser │         │  • Session Repo    │
-    └─────────┬──────────┘         └─────────┬──────────┘
-              │                              │
-    ┌─────────▼──────────┐         ┌─────────▼──────────┐
-    │   OpenRouter API   │         │   SQLite/Postgres  │
-    │   (Free models)    │         │     Database       │
-    └────────────────────┘         └────────────────────┘
+└────┬──────────────────────────────────────┬─────────────────┘
+     │                                      │
+     │                        ┌─────────────▼──────────────┐
+     │                        │  Lesson Management Layer   │
+     │                        │  • Pydantic Schemas        │
+     │                        │  • LessonLoaderService     │
+     │                        │  • LessonCache             │
+     │                        │  • FileWatcher             │
+     │                        │  • VersionManager          │
+     │                        └──────────┬─────────────────┘
+     │                                   │
+     │                   ┌───────────────┼───────────────┐
+     │                   │               │               │
+┌────▼──────────┐  ┌─────▼──────┐  ┌───▼────────────┐  │
+│ AI Integration│  │Data Access │  │  Lesson Files  │  │
+│     Layer     │  │   Layer    │  │  (JSON)        │  │
+│ • OpenRouter  │  │ • User Repo│  │  ├─beginner/   │  │
+│   Client      │  │ • Lesson   │  │  ├─intermediate│  │
+│ • Prompt Mgr  │  │   Repo     │  │  └─advanced/   │  │
+│ • Response    │  │ • Version  │  └────────────────┘  │
+│   Parser      │  │   Repo     │                      │
+└────┬──────────┘  │ • Progress │                      │
+     │             │   Repo     │                      │
+     │             │ • Session  │                      │
+     │             │   Repo     │                      │
+     │             └─────┬──────┘                      │
+     │                   │                             │
+┌────▼──────────┐  ┌─────▼──────────┐                 │
+│ OpenRouter API│  │SQLite/Postgres │                 │
+│ (Free models) │  │   Database     │◄────────────────┘
+└───────────────┘  └────────────────┘
 ```
 
 ### 2. System Components
@@ -83,21 +99,41 @@
 - Returns parsed, validated responses
 - Handles errors with automatic fallback
 
+#### 2.3.5 Lesson Management Layer
+**Responsibility**: Load, validate, cache, and version lesson content
+
+**Components**:
+- **Pydantic Schemas**: Validate lesson JSON structure (theory, examples, exercises)
+- **LessonLoaderService**: Load and validate lessons from JSON files, generate slugs
+- **LessonCache**: In-memory cache with thread-safe access for performance
+- **FileWatcher**: Monitor lesson directory for changes, trigger hot reload
+- **VersionManager**: Track content changes, create versions, manage rollback
+
+**Key Interactions**:
+- Loads lessons from JSON files on application startup
+- Validates content using Pydantic schemas before persistence
+- Caches lessons in memory for fast retrieval
+- Detects file changes and automatically reloads content (hot reload)
+- Creates version history on content changes
+- Provides rollback capability to previous versions
+
 #### 2.4 Data Access Layer
 **Responsibility**: Abstract database operations with async patterns
 
 **Components**:
 - **Async User Repository**: CRUD operations for user data, skill level, goals
-- **Async Lesson Repository**: Retrieve lessons by skill level, tags, order (seeded from private content repo)
+- **Async Lesson Repository**: Retrieve lessons by skill level, slug, tags (loaded from JSON files via LessonLoaderService)
+- **Async LessonVersion Repository**: CRUD operations for lesson version history
 - **Async Progress Repository**: Track lesson status, attempts, scores
 - **Async Session Repository**: Manage active session state, context data
 - **Dependency Container**: Manages async session creation and component lifecycle
 
 **Key Interactions**:
-- Receives data queries from Application Core
+- Receives data queries from Application Core and Lesson Management Layer
 - Executes async SQLAlchemy queries against database
 - Returns domain models with proper session management
 - Handles transactions and error recovery
+- Supports upsert operations for lesson content updates
 
 ### 3. Component Interactions
 
@@ -117,11 +153,51 @@ User → Telegram → Bot Handler (with injected dependencies)
 - AssessmentEngine receives AI Client via constructor injection
 - Repositories created with async sessions from Dependency Container
 
+#### 3.1.5 Lesson Loading Flow (Application Startup)
+```
+Application Startup → LessonLoaderService
+                              ↓
+                      Scan Lesson Directory (JSON files)
+                              ↓
+                      Load & Validate (Pydantic Schemas)
+                              ↓
+                      Generate Slugs & Versions
+                              ↓
+                      Upsert to Database → Async Lesson Repository
+                              ↓
+                      Populate Cache → LessonCache
+                              ↓
+                      Start FileWatcher (Hot Reload)
+                              ↓
+                      Application Ready
+```
+
+**Hot Reload Flow**:
+```
+JSON File Changed → FileWatcher Detects
+                              ↓
+                      Load & Validate File
+                              ↓
+                      Check Content Hash (Changed?)
+                              ↓
+                      Create New Version → VersionManager
+                              ↓
+                      Update Database → Lesson Repository
+                              ↓
+                      Update Cache → LessonCache
+                              ↓
+                      Content Live (No Restart)
+```
+
 #### 3.2 Lesson Delivery Flow
 ```
 User Action → Bot Handler → Flow Orchestrator
                                   ↓
+                          LessonCache (Check Cache)
+                                  ↓ (Cache Miss)
                           Lesson Repository → Database
+                                  ↓
+                          Update Cache → LessonCache
                                   ↓
                           Content Delivery Manager
                                   ↓
@@ -146,7 +222,8 @@ User Prompt → Bot Handler → Assessment Engine
 #### 4.1 State Management
 - **Session State**: Database-persisted in UserSession.context_data (stateless application)
 - **User Progress**: Direct database writes with async repositories
-- **Lesson Content**: Cached with database backing for consistency
+- **Lesson Content**: In-memory cache (LessonCache) with database backing for consistency
+- **Content Versions**: Database-persisted version history for rollback capability
 
 #### 4.2 Message Flow
 1. Incoming: Telegram → Handler → State Manager → Core Logic
@@ -155,15 +232,16 @@ User Prompt → Bot Handler → Assessment Engine
 
 ### 5. Technology Mapping
 
-| Layer            | Technologies                                                |
-| ---------------- | ----------------------------------------------------------- |
-| Bot Interface    | python-telegram-bot, asyncio                                |
-| Application Core | Python 3.11+, Pydantic                                      |
-| AI Integration   | httpx, OpenAI SDK (OpenRouter-compatible)                   |
-| Data Access      | SQLAlchemy (async), Alembic, Dependency Injection Container |
-| Database         | SQLite (MVP) / PostgreSQL (production)                      |
-| Configuration    | python-dotenv, Pydantic Settings                            |
-| Logging          | loguru                                                      |
+| Layer              | Technologies                                                |
+| ------------------ | ----------------------------------------------------------- |
+| Bot Interface      | python-telegram-bot, asyncio                                |
+| Application Core   | Python 3.11+, Pydantic                                      |
+| AI Integration     | httpx, OpenAI SDK (OpenRouter-compatible)                   |
+| Lesson Management  | Pydantic, watchfiles, semver, hashlib                       |
+| Data Access        | SQLAlchemy (async), Alembic, Dependency Injection Container |
+| Database           | SQLite (MVP) / PostgreSQL (production)                      |
+| Configuration      | python-dotenv, Pydantic Settings                            |
+| Logging            | loguru                                                      |
 
 ### 6. Scalability Considerations
 
@@ -171,11 +249,14 @@ User Prompt → Bot Handler → Assessment Engine
 - Stateless application design (session state externalized to database)
 - Connection pooling for database
 - Async/await for I/O-bound operations
+- In-memory lesson cache per instance (synchronization via hot reload)
 
 #### 6.2 Vertical Optimization
 - Message batching to reduce API calls
 - Database query optimization with indexes
 - AI response caching for common queries
+- Lesson content caching in memory (O(1) lookup)
+- Hot reload for content updates without restart
 
 #### 6.3 Rate Limiting
 - Per-user: 10 requests/minute (Bot Interface Layer)
@@ -253,3 +334,8 @@ Monitoring Stack (metrics, logs, traces)
 | Free Tier AI Models            | Zero AI costs for MVP, validate demand before paid tier investment                        |
 | Polling (MVP)                  | Simpler deployment, webhook for production with proper infrastructure                     |
 | SQLite → PostgreSQL            | Start simple, migrate when scaling requires concurrent write support                      |
+| Slug-based Lesson ID           | Semantic identification, flexible ordering without file renaming                          |
+| In-Memory Lesson Cache         | Fast retrieval (O(1)), reduced database load, improved response times                     |
+| Hot Reload with File Watcher   | Content updates without restart, improved content iteration workflow                      |
+| Content Versioning             | Track changes, enable rollback, support A/B testing                                       |
+| JSON File-based Content        | Easy content management, version control with Git, separation of concerns                 |

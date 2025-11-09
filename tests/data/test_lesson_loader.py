@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from promptheus.data.async_repositories import AsyncLessonRepository
+from promptheus.data.lesson_cache import LessonCache
 from promptheus.data.lesson_loader import LessonLoaderService
 from promptheus.data.models import SkillLevel
 
@@ -29,11 +30,33 @@ class TestLessonLoaderService:
         return repo
 
     @pytest.fixture
-    def loader_service(self, mock_settings, mock_lesson_repo):
+    def mock_lesson_cache(self):
+        """Mock lesson cache."""
+        cache = MagicMock(spec=LessonCache)
+        cache.get = AsyncMock(return_value=None)
+        cache.set = AsyncMock()
+        cache.reload_skill_level = AsyncMock(return_value=1)
+        return cache
+
+    @pytest.fixture
+    def mock_schemas(self, sample_lesson_json):
+        """Mock schemas that returns real schema instances."""
+        from promptheus.data.schemas import LessonContentSchema
+
+        schemas = MagicMock()
+        schemas.from_json = MagicMock(
+            return_value=LessonContentSchema.from_json(sample_lesson_json)
+        )
+        return schemas
+
+    @pytest.fixture
+    def loader_service(self, mock_settings, mock_lesson_repo, mock_lesson_cache, mock_schemas):
         """Create loader service with mocked dependencies."""
         return LessonLoaderService(
             settings=mock_settings,
             lesson_repo=mock_lesson_repo,
+            cache=mock_lesson_cache,
+            schemas=mock_schemas,
         )
 
     @pytest.fixture
@@ -57,15 +80,88 @@ class TestLessonLoaderService:
             "exercises": {"scenarios": [{"scenario": "Test scenario", "task": "Test task"}]},
         }
 
-    def test_init_with_dependencies(self, mock_settings, mock_lesson_repo):
+    def test_init_with_dependencies(
+        self, mock_settings, mock_lesson_repo, mock_lesson_cache, mock_schemas
+    ):
         """Test initialization with provided dependencies."""
         service = LessonLoaderService(
             settings=mock_settings,
             lesson_repo=mock_lesson_repo,
+            cache=mock_lesson_cache,
+            schemas=mock_schemas,
         )
 
         assert service.settings == mock_settings
         assert service.lesson_repo == mock_lesson_repo
+        assert service.cache == mock_lesson_cache
+        assert service.schemas == mock_schemas
+
+    @pytest.mark.asyncio
+    async def test_get_lesson_from_cache(
+        self, loader_service, mock_lesson_cache, sample_lesson_json
+    ):
+        """Test getting lesson from cache first."""
+        from promptheus.data.schemas import LessonContentSchema
+
+        # Mock cache hit
+        cached_lesson = LessonContentSchema.from_json(sample_lesson_json)
+        mock_lesson_cache.get.return_value = cached_lesson
+
+        result = await loader_service.get_lesson("beginner", "test-lesson")
+
+        assert result == cached_lesson
+        mock_lesson_cache.get.assert_called_once_with(SkillLevel.BEGINNER, "test-lesson")
+        # Should not call database
+        loader_service.lesson_repo.find_by_slug.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_get_lesson_from_database_and_cache(
+        self, loader_service, mock_lesson_cache, mock_lesson_repo, mock_schemas, sample_lesson_json
+    ):
+        """Test getting lesson from database when not in cache."""
+        from promptheus.data.schemas import LessonContentSchema
+
+        # Mock cache miss
+        mock_lesson_cache.get.return_value = None
+
+        # Mock database result
+        mock_db_lesson = MagicMock()
+        mock_db_lesson.title = "Test Lesson"
+        mock_db_lesson.skill_level = SkillLevel.BEGINNER
+        mock_db_lesson.tags = ["general"]
+        mock_db_lesson.theory_content = {"sections": [{"content": "test"}]}
+        mock_db_lesson.examples = {"comparisons": []}
+        mock_db_lesson.exercises = {"scenarios": []}
+        mock_lesson_repo.find_by_slug.return_value = mock_db_lesson
+
+        # Mock schema creation
+        mock_schema_instance = LessonContentSchema.from_json(sample_lesson_json)
+        mock_schemas.from_json.return_value = mock_schema_instance
+
+        result = await loader_service.get_lesson("beginner", "test-lesson")
+
+        assert result == mock_schema_instance
+        mock_lesson_cache.get.assert_called_once_with(SkillLevel.BEGINNER, "test-lesson")
+        mock_lesson_repo.find_by_slug.assert_called_once_with(SkillLevel.BEGINNER, "test-lesson")
+        # Should cache the result
+        mock_lesson_cache.set.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_lesson_invalid_skill_level(self, loader_service):
+        """Test getting lesson with invalid skill level."""
+        result = await loader_service.get_lesson("invalid", "test-lesson")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_lesson_no_cache_no_repo(self, loader_service):
+        """Test getting lesson when no cache or repo available."""
+        loader_service.cache = None
+        loader_service.lesson_repo = None
+
+        result = await loader_service.get_lesson("beginner", "test-lesson")
+
+        assert result is None
 
     def test_init_without_dependencies(self):
         """Test initialization without dependencies (uses defaults)."""
@@ -240,20 +336,10 @@ class TestLessonLoaderService:
 
         mock_settings.lessons_content_path = lessons_dir
 
-        with patch("promptheus.data.lesson_loader.LessonContentSchema") as mock_schema:
-            mock_instance = MagicMock()
-            mock_instance.title = "Test Lesson"
-            mock_instance.skill_level = SkillLevel.BEGINNER
-            mock_instance.tags = ["test"]
-            mock_instance.theory_content = {"sections": []}
-            mock_instance.examples = {"comparisons": []}
-            mock_instance.exercises = {"scenarios": []}
-            mock_schema.from_json.return_value = mock_instance
+        result = await loader_service.batch_load_all()
 
-            result = await loader_service.batch_load_all()
-
-            assert result == 1
-            loader_service.lesson_repo.upsert_lesson.assert_called_once()
+        assert result == 1
+        loader_service.lesson_repo.upsert_lesson.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_batch_load_all_with_errors(self, loader_service, mock_settings, tmp_path):
@@ -275,26 +361,20 @@ class TestLessonLoaderService:
 
         mock_settings.lessons_content_path = lessons_dir
 
-        with patch("promptheus.data.lesson_loader.LessonContentSchema") as mock_schema:
-            # Mock successful validation for first file
-            mock_instance = MagicMock()
-            mock_instance.title = "Valid Lesson"
-            mock_instance.skill_level = SkillLevel.BEGINNER
-            mock_instance.tags = []
-            mock_instance.theory_content = {"sections": []}
-            mock_instance.examples = {"comparisons": []}
-            mock_instance.exercises = {"scenarios": []}
+        # Mock the schemas to fail on invalid data
+        def mock_from_json(data):
+            if "title" in data and "skill_level" in data:
+                # Return real schema for valid data
+                from promptheus.data.schemas import LessonContentSchema
 
-            def mock_from_json(data):
-                if "Valid" in json.dumps(data):
-                    return mock_instance
-                else:
-                    raise Exception("Validation failed")
+                return LessonContentSchema.from_json(data)
+            else:
+                raise Exception("Validation failed")
 
-            mock_schema.from_json.side_effect = mock_from_json
+        loader_service.schemas.from_json.side_effect = mock_from_json
 
-            result = await loader_service.batch_load_all()
+        result = await loader_service.batch_load_all()
 
-            # Should have loaded 1 lesson successfully
-            assert result == 1
-            loader_service.lesson_repo.upsert_lesson.assert_called_once()
+        # Should have loaded 1 lesson successfully
+        assert result == 1
+        loader_service.lesson_repo.upsert_lesson.assert_called_once()

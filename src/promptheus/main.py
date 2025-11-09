@@ -14,6 +14,7 @@ from telegram.ext import (
     filters,
 )
 
+from promptheus.api.admin import router as admin_router
 from promptheus.api.health import router as health_router
 from promptheus.config import get_settings
 from promptheus.config.settings import Settings
@@ -55,15 +56,42 @@ async def start_api_server(settings: Settings) -> None:
 
     logger.info("Starting API server", host=settings.api_server_host, port=settings.api_server_port)
 
-    # Create FastAPI app
+    # Get dependency container for file watcher access
+    container = DependencyContainer.get_instance()
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Lifespan context manager for FastAPI app."""
+        # Startup: Start file watcher
+        try:
+            file_watcher = await container.get_file_watcher()
+            await file_watcher.start()
+            logger.info("File watcher started successfully")
+        except Exception as e:
+            logger.error("Failed to start file watcher", error=str(e))
+            # Don't fail startup if file watcher fails, just log
+
+        yield
+
+        # Shutdown: Stop file watcher
+        try:
+            file_watcher = await container.get_file_watcher()
+            await file_watcher.stop()
+            logger.info("File watcher stopped successfully")
+        except Exception as e:
+            logger.error("Error stopping file watcher", error=str(e))
+
+    # Create FastAPI app with lifespan
     app = FastAPI(
         title="Promptheus API",
         description="API server for Promptheus bot health checks and management endpoints",
         version="0.1.0",
+        lifespan=lifespan,
     )
 
     # Include routers
     app.include_router(health_router)
+    app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
     # Configure uvicorn server
     config = uvicorn.Config(

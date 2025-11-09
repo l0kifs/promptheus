@@ -1,5 +1,7 @@
 """Dependency injection container for managing application components."""
 
+import asyncio
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -19,6 +21,8 @@ from promptheus.data.async_repositories import (
     AsyncSessionRepository,
     AsyncUserRepository,
 )
+from promptheus.data.file_watcher import FileWatcher
+from promptheus.data.lesson_cache import LessonCache
 from promptheus.data.lesson_loader import LessonLoaderService
 
 
@@ -83,6 +87,14 @@ class DependencyContainer:
             rate_limit_service = RateLimitService()
             self._register_component("rate_limit_service", rate_limit_service)
 
+            # Initialize lesson cache
+            lesson_cache = LessonCache()
+            self._register_component("lesson_cache", lesson_cache)
+
+            # Initialize file watcher (will be started in FastAPI lifespan)
+            file_watcher = FileWatcher()
+            self._register_component("file_watcher", file_watcher)
+
             logger.info("Dependency container initialized successfully")
             self._initialized = True
 
@@ -139,10 +151,40 @@ class DependencyContainer:
     async def get_lesson_loader_service(self) -> LessonLoaderService:
         """Get LessonLoaderService with dependencies."""
         lesson_repo = await self.get_lesson_repository()
-        return LessonLoaderService(
+        lesson_cache = self.get_lesson_cache()
+        file_watcher = self.get_file_watcher()
+
+        # Create lesson loader
+        lesson_loader = LessonLoaderService(
             settings=get_settings(),
             lesson_repo=lesson_repo,
+            cache=lesson_cache,
         )
+
+        # Set reload callback on file watcher to use lesson loader
+        def reload_callback(changed_paths: set[Path]) -> None:
+            """Handle file changes by reloading affected lessons."""
+            # Create task to run async reload in background
+            asyncio.create_task(_reload_changed_paths(changed_paths))
+
+        async def _reload_changed_paths(changed_paths: set[Path]) -> None:
+            """Async helper to reload changed paths."""
+            for path in changed_paths:
+                # Extract skill level from path
+                skill_level = path.parent.name
+                await lesson_loader.reload_skill_level(skill_level)
+
+        file_watcher.set_reload_callback(reload_callback)
+
+        return lesson_loader
+
+    def get_lesson_cache(self) -> LessonCache:
+        """Get LessonCache."""
+        return self.get_component("lesson_cache")
+
+    def get_file_watcher(self) -> FileWatcher:
+        """Get FileWatcher."""
+        return self.get_component("file_watcher")
 
     def get_rate_limit_service(self) -> RateLimitService:
         """Get RateLimitService."""

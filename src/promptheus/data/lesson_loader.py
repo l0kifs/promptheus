@@ -9,6 +9,7 @@ from loguru import logger
 
 from promptheus.config import get_settings
 from promptheus.data.async_repositories import AsyncLessonRepository
+from promptheus.data.lesson_cache import LessonCache
 from promptheus.data.schemas import LessonContentSchema
 
 
@@ -64,6 +65,7 @@ class LessonLoaderService:
         settings: Any = None,
         lesson_repo: AsyncLessonRepository | None = None,
         schemas: Any = None,
+        cache: LessonCache | None = None,
     ) -> None:
         """Initialize lesson loader service.
 
@@ -71,10 +73,73 @@ class LessonLoaderService:
             settings: Application settings (uses get_settings() if not provided)
             lesson_repo: Lesson repository (will be injected via dependency container)
             schemas: Schema classes (will be injected via dependency container)
+            cache: Lesson cache for in-memory storage (will be injected via dependency container)
         """
         self.settings = settings or get_settings()
         self.lesson_repo = lesson_repo
         self.schemas = schemas or LessonContentSchema
+        self.cache = cache
+
+    async def get_lesson(self, skill_level: str, slug: str) -> LessonContentSchema | None:
+        """Get lesson from cache or database.
+
+        Args:
+            skill_level: Skill level name (beginner, intermediate, advanced)
+            slug: Lesson slug identifier
+
+        Returns:
+            Lesson content if found, None otherwise
+        """
+        from promptheus.data.models import SkillLevel
+
+        try:
+            skill_level_enum = SkillLevel(skill_level.lower())
+        except ValueError:
+            logger.warning("Invalid skill level requested", skill_level=skill_level)
+            return None
+
+        # Try cache first if available
+        if self.cache:
+            cached_lesson = await self.cache.get(skill_level_enum, slug)
+            if cached_lesson:
+                return cached_lesson
+
+        # Fall back to database
+        if not self.lesson_repo:
+            logger.warning("No lesson repository available for database lookup")
+            return None
+
+        try:
+            lesson_data = await self.lesson_repo.find_by_slug(skill_level_enum, slug)
+            if not lesson_data:
+                return None
+
+            # Convert database model to schema
+            lesson_schema = self.schemas.from_json(
+                {
+                    "title": lesson_data.title,
+                    "skill_level": lesson_data.skill_level.value,
+                    "tags": lesson_data.tags,
+                    "theory_content": lesson_data.theory_content,
+                    "examples": lesson_data.examples,
+                    "exercises": lesson_data.exercises,
+                }
+            )
+
+            # Cache the lesson if cache is available
+            if self.cache:
+                await self.cache.set(skill_level_enum, slug, lesson_schema)
+
+            return lesson_schema
+
+        except Exception as e:
+            logger.error(
+                "Error retrieving lesson from database",
+                skill_level=skill_level,
+                slug=slug,
+                error=str(e),
+            )
+            return None
 
     async def scan_directory(self) -> dict[str, list[Path]]:
         """Scan lessons directory and organize JSON files by skill level.
@@ -248,6 +313,7 @@ class LessonLoaderService:
 
         loaded_count = 0
         errors: list[str] = []
+        cache_updates = {}  # skill_level -> {slug: lesson}
 
         # Process each skill level
         for skill_level, file_paths in lessons_by_level.items():
@@ -255,6 +321,7 @@ class LessonLoaderService:
                 "Processing skill level", skill_level=skill_level, file_count=len(file_paths)
             )
 
+            skill_cache = {}
             for index, file_path in enumerate(file_paths, 1):
                 try:
                     # Load and validate lesson
@@ -274,11 +341,14 @@ class LessonLoaderService:
                         skill_level=schema.skill_level,
                         slug=slug,
                         position=position,
-                        tags=schema.tags,
+                        tags=[tag.value for tag in schema.tags],  # Convert Tag enums to strings
                         theory_content=schema.theory_content.model_dump(),
                         examples=schema.examples.model_dump(),
                         exercises=schema.exercises.model_dump(),
                     )
+
+                    # Add to cache update
+                    skill_cache[slug] = schema
 
                     loaded_count += 1
                     logger.info(
@@ -295,6 +365,22 @@ class LessonLoaderService:
                     errors.append(error_msg)
                     # Continue with other lessons
 
+            # Store cache updates for this skill level
+            if skill_cache:
+                from promptheus.data.models import SkillLevel
+
+                cache_updates[SkillLevel(skill_level.lower())] = skill_cache
+
+        # Update cache with all loaded lessons
+        if self.cache and cache_updates:
+            for skill_level, lessons in cache_updates.items():
+                count = await self.cache.reload_skill_level(skill_level, lessons)
+                logger.info(
+                    "Skill level cached",
+                    skill_level=skill_level.value,
+                    lessons_cached=count,
+                )
+
         # Log summary
         if errors:
             logger.warning(
@@ -310,6 +396,134 @@ class LessonLoaderService:
             logger.info("Batch loading completed successfully", loaded_count=loaded_count)
 
         return loaded_count
+
+    async def reload_lesson(self, file_path: Path) -> bool:
+        """Reload a single lesson from file and update cache.
+
+        Args:
+            file_path: Path to the lesson JSON file
+
+        Returns:
+            True if reload successful, False otherwise
+        """
+        try:
+            logger.info("Reloading lesson from file", file_path=file_path)
+
+            # Load and validate lesson
+            schema = await self.load_lesson(file_path)
+
+            # Generate slug
+            slug = generate_slug(schema.title)
+            if not slug:
+                raise ValueError(f"Cannot generate slug for title: {schema.title}")
+
+            # Update cache if available
+            if self.cache:
+                await self.cache.set(schema.skill_level, slug, schema)
+                logger.info("Lesson reloaded and cached", title=schema.title, slug=slug)
+            else:
+                logger.warning("No cache available for lesson reload")
+
+            # Update database if repository available
+            if self.lesson_repo:
+                # Calculate position (use a default since we don't know the order)
+                position = 999
+
+                await self.lesson_repo.upsert_lesson(
+                    title=schema.title,
+                    skill_level=schema.skill_level,
+                    slug=slug,
+                    position=position,
+                    tags=[tag.value for tag in schema.tags],
+                    theory_content=schema.theory_content.model_dump(),
+                    examples=schema.examples.model_dump(),
+                    exercises=schema.exercises.model_dump(),
+                )
+                logger.info("Lesson reloaded and saved to database", title=schema.title, slug=slug)
+
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Failed to reload lesson",
+                file_path=file_path,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return False
+
+    async def reload_skill_level(self, skill_level_name: str) -> int:
+        """Reload all lessons for a skill level from files.
+
+        Args:
+            skill_level_name: Name of the skill level (beginner, intermediate, advanced)
+
+        Returns:
+            Number of lessons reloaded
+        """
+        from promptheus.data.models import SkillLevel
+
+        try:
+            skill_level = SkillLevel(skill_level_name.lower())
+        except ValueError:
+            logger.error("Invalid skill level for reload", skill_level=skill_level_name)
+            return 0
+
+        logger.info("Reloading skill level from files", skill_level=skill_level_name)
+
+        try:
+            # Scan directory for this skill level
+            level_path = self.settings.lessons_content_path / skill_level_name
+            if not level_path.exists():
+                logger.warning("Skill level directory not found", skill_level=skill_level_name)
+                return 0
+
+            json_files = sorted(level_path.glob("*.json"))
+            logger.debug(
+                "Found files for reload",
+                skill_level=skill_level_name,
+                file_count=len(json_files),
+            )
+
+            # Load all lessons for this skill level
+            lessons = {}
+            for file_path in json_files:
+                try:
+                    schema = await self.load_lesson(file_path)
+                    slug = generate_slug(schema.title)
+                    if slug:
+                        lessons[slug] = schema
+                    else:
+                        logger.warning("Skipping lesson without valid slug", file_path=file_path)
+                except Exception as e:
+                    logger.error(
+                        "Failed to load lesson during skill level reload",
+                        file_path=file_path,
+                        error=str(e),
+                    )
+                    # Continue with other lessons
+
+            # Update cache atomically
+            if self.cache:
+                count = await self.cache.reload_skill_level(skill_level, lessons)
+                logger.info(
+                    "Skill level reloaded into cache",
+                    skill_level=skill_level_name,
+                    lessons_loaded=count,
+                )
+                return count
+            else:
+                logger.warning("No cache available for skill level reload")
+                return len(lessons)
+
+        except Exception as e:
+            logger.error(
+                "Failed to reload skill level",
+                skill_level=skill_level_name,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return 0
 
     def _extract_order_index(self, file_path: Path) -> int:
         """Extract order index from filename.

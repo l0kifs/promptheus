@@ -21,6 +21,7 @@ dependencies = [
     "loguru>=0.7",
     "fastapi>=0.104",
     "uvicorn[standard]>=0.24",
+    "watchfiles>=0.21",
 ]
 
 [dependency-groups]

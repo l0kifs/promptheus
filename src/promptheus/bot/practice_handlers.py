@@ -251,9 +251,43 @@ class PracticeHandlersMixin:
         )
 
         try:
-            # Get AI feedback
+            # Get lesson to extract exercise context
+            lesson = await self.learning_orchestrator.lesson_repo.find_by_id(lesson_id)
+
+            if not lesson:
+                logger.error("Lesson not found for evaluation", lesson_id=lesson_id)
+                await loading_msg.edit_text(
+                    "❌ Error: Lesson not found. Please try again.",
+                    parse_mode="Markdown",
+                )
+                return
+
+            # Extract exercise scenario and task from lesson
+            exercises = lesson.exercises  # type: ignore
+            scenarios = exercises.get("scenarios", [])
+
+            exercise_scenario = ""
+            exercise_task = ""
+            if scenarios:
+                first_scenario = scenarios[0]
+                exercise_scenario = first_scenario.get("scenario", "")
+                exercise_task = first_scenario.get("task", "")
+
+            # Get user for skill level and learning goal
+            user = await self.learning_orchestrator.user_repo.find_by_telegram_id(user_id)
+            skill_level = user.skill_level.value if user else "beginner"
+            learning_goal = user.learning_goal.value if user else "general"
+
+            # Get AI feedback with exercise context
             assessment_engine = self.assessment_engine
-            feedback = await assessment_engine.evaluate_user_prompt(user_prompt, lesson_id)
+            feedback = await assessment_engine.evaluate_user_prompt(
+                user_prompt=user_prompt,
+                lesson_id=lesson_id,
+                exercise_scenario=exercise_scenario,
+                exercise_task=exercise_task,
+                skill_level=skill_level,
+                learning_goal=learning_goal,
+            )
 
             logger.info(
                 "Prompt evaluation complete",

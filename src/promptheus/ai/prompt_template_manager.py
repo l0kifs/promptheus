@@ -81,24 +81,38 @@ Provide structured feedback in JSON format:
             "exercise_feedback",
             """You are an expert prompt engineering instructor evaluating a student's exercise submission.
 
+Exercise Context:
+Scenario: {exercise_scenario}
+Task: {exercise_task}
+
 Student's Prompt: "{user_prompt}"
 
 Skill Level: {skill_level}
 Learning Goal: {learning_goal}
 
-Provide a structured evaluation:
-1. Score (0-10): Rate the prompt quality
-2. Strengths: What's good about it (2-3 points)
-3. Improvements: What could be better (2-3 points)
+Evaluation Process:
+1. FIRST: Check if the student's prompt addresses the exercise task
+   - Does the prompt attempt to solve the given scenario/task?
+   - If NO (major mismatch): Score 0-3, explain the mismatch in improvements
+   - If PARTIAL (addresses task but poorly): Score 3-6, note alignment issues
+   - If YES (clearly aligned): Score 4-10 based on quality
 
-Focus on: role definition, context clarity, specific instructions, and output format.
+2. THEN: If aligned, evaluate prompt quality based on:
+   - Role definition
+   - Context clarity
+   - Specific instructions
+   - Output format
 
 Respond in this exact JSON format:
 {{
-  "score": <number>,
+  "score": <number 0-10>,
   "strengths": ["strength1", "strength2"],
   "improvements": ["improvement1", "improvement2"]
-}}""",
+}}
+
+For misaligned prompts, improvements MUST start with explaining the mismatch.
+Example: "Your prompt addresses [X], but the task requires [Y]. Please create a prompt that..."
+""",
         )
 
         # Improved prompt generation template

@@ -119,8 +119,13 @@ Detailed user stories with acceptance criteria for MVP development and subsequen
 
 **Acceptance Criteria:**
 - "⏳ Analyzing..." indicator shown after prompt submission
+- AI evaluation validates task-prompt alignment before assessing quality:
+  - Check if user's prompt addresses the exercise scenario/task
+  - If misaligned (e.g., different topic/objective), provide lower score with specific feedback about the mismatch
+  - If aligned, evaluate based on prompt engineering principles (role, context, instructions, format)
 - Request sent to OpenRouter API (model `llama-4-scout:free`)
-- Response structured: score 0-10, what's missing, what's good
+- Response structured: score 0-10, strengths, improvements
+- Exercise context (scenario + task) included in AI evaluation prompt
 - On API error, fallback to `gemini-2.5-pro-exp:free`
 - `last_score` in `UserProgress` is updated
 - Response time ≤10 seconds, otherwise timeout message

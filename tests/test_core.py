@@ -227,13 +227,20 @@ class TestAssessmentEngine:
         engine.template_manager.render.return_value = "Rendered prompt"
 
         result = await engine.evaluate_user_prompt(
-            user_prompt="Test prompt", lesson_id=1, skill_level="beginner", learning_goal="academic"
+            user_prompt="Test prompt",
+            lesson_id=1,
+            exercise_scenario="Test scenario",
+            exercise_task="Test task",
+            skill_level="beginner",
+            learning_goal="academic",
         )
 
         # Verify template manager was called correctly
         engine.template_manager.render.assert_called_once_with(
             "exercise_feedback",
             user_prompt="Test prompt",
+            exercise_scenario="Test scenario",
+            exercise_task="Test task",
             skill_level="beginner",
             learning_goal="academic",
         )
@@ -246,6 +253,116 @@ class TestAssessmentEngine:
         assert result["score"] == 8
         assert result["strengths"] == ["Good structure", "Clear objective"]
         assert result["improvements"] == ["Add more context"]
+
+    @pytest.mark.asyncio
+    async def test_evaluate_prompt_with_task_mismatch(self, engine, mocker):
+        """Test that misaligned prompts receive low scores."""
+        # Mock settings
+        mock_settings = mocker.Mock()
+        mock_settings.max_tokens_feedback = 512
+        mock_settings.temperature_feedback = 0.3
+        engine.settings = mock_settings
+
+        # Mock AI response for misaligned prompt
+        engine.ai_client.call_with_fallback.return_value = """{
+            "score": 2,
+            "strengths": ["Well-written prompt for a different task"],
+            "improvements": [
+                "Your prompt addresses business decision analysis, but the task requires a 4-prompt workflow chain for content marketing",
+                "Create 4 connected prompts with clear handoffs between them"
+            ]
+        }"""
+
+        # Mock template manager
+        engine.template_manager.render.return_value = "Rendered prompt with task context"
+
+        result = await engine.evaluate_user_prompt(
+            user_prompt="Analyze my business decision to expand to new market...",
+            lesson_id=12,
+            exercise_scenario="You want to create a content marketing workflow",
+            exercise_task="Design a 4-prompt chain: topic research → headline generation → outline creation → first draft",
+            skill_level="advanced",
+            learning_goal="professional",
+        )
+
+        assert result["score"] <= 3  # Low score for mismatch
+        assert any("task requires" in imp.lower() for imp in result["improvements"])
+
+        # Verify template was called with exercise context
+        engine.template_manager.render.assert_called_once()
+        call_args = engine.template_manager.render.call_args[1]
+        assert "exercise_scenario" in call_args
+        assert "exercise_task" in call_args
+        assert call_args["exercise_scenario"] == "You want to create a content marketing workflow"
+        assert "4-prompt chain" in call_args["exercise_task"]
+
+    @pytest.mark.asyncio
+    async def test_evaluate_prompt_with_task_alignment(self, engine, mocker):
+        """Test that aligned prompts are evaluated on quality."""
+        # Mock settings
+        mock_settings = mocker.Mock()
+        mock_settings.max_tokens_feedback = 512
+        mock_settings.temperature_feedback = 0.3
+        engine.settings = mock_settings
+
+        # Mock AI response for aligned prompt
+        engine.ai_client.call_with_fallback.return_value = """{
+            "score": 8,
+            "strengths": [
+                "Addresses the task correctly with 4-prompt chain",
+                "Clear handoffs between prompts"
+            ],
+            "improvements": [
+                "Could add more specific role definitions",
+                "Consider specifying output format for each step"
+            ]
+        }"""
+
+        engine.template_manager.render.return_value = "Rendered prompt"
+
+        result = await engine.evaluate_user_prompt(
+            user_prompt="Prompt 1: Research trending topics in [industry]... Prompt 2: Using the topics from above, generate 10 headlines...",
+            lesson_id=12,
+            exercise_scenario="You want to create a content marketing workflow",
+            exercise_task="Design a 4-prompt chain: topic research → headline generation → outline creation → first draft",
+            skill_level="advanced",
+            learning_goal="professional",
+        )
+
+        assert result["score"] >= 7  # Good score for aligned, quality prompt
+        assert "Addresses the task correctly" in result["strengths"][0]
+
+    @pytest.mark.asyncio
+    async def test_evaluate_prompt_backward_compatibility(self, engine, mocker):
+        """Test that evaluation works without exercise context (backward compatibility)."""
+        # Mock settings
+        mock_settings = mocker.Mock()
+        mock_settings.max_tokens_feedback = 512
+        mock_settings.temperature_feedback = 0.3
+        engine.settings = mock_settings
+
+        # Mock AI response
+        engine.ai_client.call_with_fallback.return_value = """{
+            "score": 6,
+            "strengths": ["Good attempt"],
+            "improvements": ["Add more context"]
+        }"""
+
+        engine.template_manager.render.return_value = "Rendered prompt"
+
+        # Call without exercise_scenario and exercise_task (using defaults)
+        result = await engine.evaluate_user_prompt(
+            user_prompt="Test prompt",
+            lesson_id=1,
+            skill_level="beginner",
+            learning_goal="academic",
+        )
+
+        assert result["score"] == 6
+        # Verify template was called with empty scenario/task
+        call_args = engine.template_manager.render.call_args[1]
+        assert call_args["exercise_scenario"] == ""
+        assert call_args["exercise_task"] == ""
 
 
 class TestProgressTracker:

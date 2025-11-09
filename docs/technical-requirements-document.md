@@ -40,6 +40,9 @@
 - **Examples**: Good vs. Bad prompt comparisons with brief annotations (2-3 sentences each)
 - **Exercises**: Scenario-based tasks with clear objectives (max 100 words)
 - **Feedback**: AI-generated evaluation with improvement suggestions (structured in 2-3 short messages)
+  - **Task-Prompt Alignment Validation**: AI first checks if user's prompt addresses the exercise scenario/task before evaluating quality
+  - If misaligned, feedback highlights the mismatch and guides user to the correct task
+  - If aligned, evaluation proceeds based on prompt engineering principles
 
 ##### 2.3.1 Progress Calculation
 - **Completion Rate**: Count of completed lessons / total attempted lessons
@@ -57,6 +60,8 @@
   - Lightweight: `qwen/qwen2.5-vl-3b-instruct:free` (3B, multimodal for examples)
 - **Model Strategy**: Start with free tier, migrate to paid models based on usage metrics and revenue
 - **Prompt Templates**: Structured templates for assessment, feedback, content generation
+  - **Exercise Feedback Template**: Includes exercise scenario + task to validate alignment
+  - AI validates task-prompt alignment before evaluating quality
 - **Response Parsing**: Extract structured data from AI responses
 - **Error Handling**: Multi-model fallback chain (primary → fallback → alternative)
 

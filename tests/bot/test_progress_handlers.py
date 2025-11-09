@@ -98,8 +98,8 @@ class TestProgressHandlers:
     async def test_continue_callback_with_user_current_lesson(
         self, mock_handlers, mock_callback_update, mock_context, mocker
     ):
-        """Test continue callback using user's current lesson when no session."""
-        # Mock user with current lesson
+        """Test continue callback showing next lesson when no progress records exist."""
+        # Mock user with current lesson (no longer used in new logic)
         mock_user = mocker.Mock()
         mock_user.skill_level = SkillLevel.BEGINNER
         mock_user.current_lesson_id = 2
@@ -108,9 +108,61 @@ class TestProgressHandlers:
         # Mock empty session context
         mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(return_value={})
 
-        # Mock lesson
+        # Mock empty progress records (no IN_PROGRESS or NOT_STARTED lessons)
+        mock_handlers.progress_tracker.progress_repo.find_by_user.return_value = []
+
+        # Mock lessons for skill level
+        mock_lessons = [
+            mocker.Mock(title="Lesson 1", id=1),
+            mocker.Mock(title="Lesson 2", id=2),
+        ]
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_skill_level.return_value = (
+            mock_lessons
+        )
+
+        # Mock callback operations
+        mock_callback_update.callback_query.answer = mocker.AsyncMock()
+        mock_callback_update.callback_query.edit_message_text = mocker.AsyncMock()
+
+        await mock_handlers.continue_callback(mock_callback_update, mock_context)
+
+        # Verify next lesson shown (first lesson when no progress)
+        mock_callback_update.callback_query.edit_message_text.assert_called_once()
+        call_args = mock_callback_update.callback_query.edit_message_text.call_args
+        assert "Continue Learning" in call_args[0][0]
+        assert "Next lesson:" in call_args[0][0]
+        assert "Lesson 1" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_continue_callback_with_in_progress_lesson(
+        self, mock_handlers, mock_callback_update, mock_context, mocker
+    ):
+        """Test continue callback prioritizing IN_PROGRESS lesson."""
+        # Mock user
+        mock_user = mocker.Mock()
+        mock_user.skill_level = SkillLevel.BEGINNER
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
+
+        # Mock empty session context
+        mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(return_value={})
+
+        # Mock progress records with IN_PROGRESS lesson
+        mock_progress_in_progress = mocker.Mock()
+        mock_progress_in_progress.lesson_id = 2
+        mock_progress_in_progress.status = LessonStatus.IN_PROGRESS
+
+        mock_progress_completed = mocker.Mock()
+        mock_progress_completed.lesson_id = 1
+        mock_progress_completed.status = LessonStatus.COMPLETED
+
+        mock_handlers.progress_tracker.progress_repo.find_by_user.return_value = [
+            mock_progress_completed,
+            mock_progress_in_progress,
+        ]
+
+        # Mock IN_PROGRESS lesson
         mock_lesson = mocker.Mock()
-        mock_lesson.title = "Current Lesson"
+        mock_lesson.title = "In Progress Lesson"
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
 
         # Mock callback operations
@@ -119,17 +171,17 @@ class TestProgressHandlers:
 
         await mock_handlers.continue_callback(mock_callback_update, mock_context)
 
-        # Verify current lesson resume shown
+        # Verify IN_PROGRESS lesson resume shown
         mock_callback_update.callback_query.edit_message_text.assert_called_once()
         call_args = mock_callback_update.callback_query.edit_message_text.call_args
-        assert "Resume Learning" in call_args[0][0]
-        assert "Current Lesson" in call_args[0][0]
+        assert "Continue Learning" in call_args[0][0]
+        assert "In Progress Lesson" in call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_continue_callback_show_lesson_list(
         self, mock_handlers, mock_callback_update, mock_context, mocker
     ):
-        """Test continue callback showing lesson list when no active lesson."""
+        """Test continue callback showing next lesson when no progress records exist."""
         # Mock user without current lesson
         mock_user = mocker.Mock()
         mock_user.skill_level = SkillLevel.BEGINNER
@@ -138,6 +190,9 @@ class TestProgressHandlers:
 
         # Mock empty session context
         mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(return_value={})
+
+        # Mock empty progress records
+        mock_handlers.progress_tracker.progress_repo.find_by_user.return_value = []
 
         # Mock lessons
         mock_lessons = [
@@ -154,12 +209,12 @@ class TestProgressHandlers:
 
         await mock_handlers.continue_callback(mock_callback_update, mock_context)
 
-        # Verify lesson list shown
+        # Verify next lesson shown (first lesson when no progress)
         mock_callback_update.callback_query.edit_message_text.assert_called_once()
         call_args = mock_callback_update.callback_query.edit_message_text.call_args
-        assert "Available Lessons" in call_args[0][0]
+        assert "Continue Learning" in call_args[0][0]
+        assert "Next lesson:" in call_args[0][0]
         assert "Lesson 1" in call_args[0][0]
-        assert "Lesson 2" in call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_continue_callback_fallback_to_beginner(
@@ -172,9 +227,10 @@ class TestProgressHandlers:
         mock_user.current_lesson_id = None
         mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
 
-        # Mock no lessons for advanced level
+        # Mock no lessons for advanced level, then beginner lessons
         mock_handlers.learning_orchestrator.lesson_repo.find_by_skill_level.side_effect = [
-            [],  # No advanced lessons
+            [],  # No advanced lessons (first call)
+            [],  # No advanced lessons (second call in fallback)
             [mocker.Mock(title="Beginner Lesson", id=1)],  # Fallback to beginner
         ]
 
@@ -188,10 +244,11 @@ class TestProgressHandlers:
         await mock_handlers.continue_callback(mock_callback_update, mock_context)
 
         # Verify fallback to beginner lessons
-        assert mock_handlers.learning_orchestrator.lesson_repo.find_by_skill_level.call_count == 2
+        assert mock_handlers.learning_orchestrator.lesson_repo.find_by_skill_level.call_count == 3
         calls = mock_handlers.learning_orchestrator.lesson_repo.find_by_skill_level.call_args_list
-        assert calls[0][0][0] == SkillLevel.ADVANCED
-        assert calls[1][0][0] == SkillLevel.BEGINNER
+        assert calls[0][0][0] == SkillLevel.ADVANCED  # First attempt
+        assert calls[1][0][0] == SkillLevel.ADVANCED  # Second attempt in fallback
+        assert calls[2][0][0] == SkillLevel.BEGINNER  # Fallback to beginner
 
         # Verify beginner lesson shown
         mock_callback_update.callback_query.edit_message_text.assert_called_once()

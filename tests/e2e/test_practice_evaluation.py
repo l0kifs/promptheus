@@ -57,7 +57,7 @@ class TestPracticeEvaluationE2E:
                 "id": 1,
                 "title": "Introduction to Prompt Engineering",
                 "skill_level": "beginner",
-                "order_index": 1,
+                "position": 1,
                 "exercises": {
                     "scenarios": [
                         {
@@ -196,9 +196,7 @@ class TestPracticeEvaluationE2E:
         mock_user_repo.find_by_telegram_id.return_value = mock_user
 
         # Mock lesson
-        mock_lesson = type(
-            "MockLesson", (), {"id": 1, "skill_level": "beginner", "order_index": 1}
-        )()
+        mock_lesson = type("MockLesson", (), {"id": 1, "skill_level": "beginner", "position": 1})()
         mock_lesson_repo.find_by_id.return_value = mock_lesson
         mock_lesson_repo.find_next_lesson.return_value = None  # No next lesson
 

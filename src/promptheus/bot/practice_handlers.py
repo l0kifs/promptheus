@@ -149,7 +149,7 @@ class PracticeHandlersMixin:
         if current_lesson:
             next_lesson = await self.learning_orchestrator.lesson_repo.find_next_lesson(
                 current_lesson.skill_level,  # type: ignore
-                current_lesson.order_index,  # type: ignore
+                current_lesson.position,  # type: ignore
             )
 
             if next_lesson:

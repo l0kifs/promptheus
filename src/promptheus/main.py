@@ -14,6 +14,7 @@ from telegram.ext import (
     filters,
 )
 
+from promptheus.api.admin import router as admin_router
 from promptheus.api.health import router as health_router
 from promptheus.config import get_settings
 from promptheus.config.settings import Settings
@@ -55,15 +56,35 @@ async def start_api_server(settings: Settings) -> None:
 
     logger.info("Starting API server", host=settings.api_server_host, port=settings.api_server_port)
 
-    # Create FastAPI app
+    # Get dependency container for file watcher access
+    container = DependencyContainer.get_instance()
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Lifespan context manager for FastAPI app."""
+        # File watcher is now started in main() after lesson loading
+        # No startup actions needed here
+        yield
+
+        # Shutdown: Stop file watcher
+        try:
+            file_watcher = container.get_file_watcher()
+            await file_watcher.stop()
+            logger.info("File watcher stopped successfully")
+        except Exception as e:
+            logger.error("Error stopping file watcher", error=str(e))
+
+    # Create FastAPI app with lifespan
     app = FastAPI(
         title="Promptheus API",
         description="API server for Promptheus bot health checks and management endpoints",
         version="0.1.0",
+        lifespan=lifespan,
     )
 
     # Include routers
     app.include_router(health_router)
+    app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
     # Configure uvicorn server
     config = uvicorn.Config(
@@ -203,10 +224,36 @@ async def main() -> None:
     try:
         container = DependencyContainer.get_instance()
         await container.initialize()
-        handlers = await container.get_bot_handlers()
         logger.info("Components initialized successfully")
     except Exception as e:
         logger.critical("Failed to initialize components", error=str(e))
+        return
+
+    # Load lessons from content directory
+    logger.info("Loading lessons from content directory")
+    try:
+        lesson_loader = await container.get_lesson_loader_service()
+        loaded_count = await lesson_loader.batch_load_all()
+        logger.info("Lessons loaded successfully", count=loaded_count)
+    except Exception as e:
+        logger.critical("Failed to load lessons, exiting", error=str(e))
+        return
+
+    # Start file watcher now that lessons are loaded and callback is set
+    logger.info("Starting file watcher for lesson content changes")
+    try:
+        file_watcher = container.get_file_watcher()
+        await file_watcher.start()
+        logger.info("File watcher started successfully")
+    except Exception as e:
+        logger.error("Failed to start file watcher", error=str(e))
+        # Don't fail startup if file watcher fails, just log
+
+    # Get bot handlers
+    try:
+        handlers = await container.get_bot_handlers()
+    except Exception as e:
+        logger.critical("Failed to initialize bot handlers", error=str(e))
         return
 
     # Create application

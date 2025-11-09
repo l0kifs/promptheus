@@ -1,15 +1,17 @@
-"""Async repository pattern for data access."""
+"""Async repository classes for database operations."""
 
 from datetime import datetime
 
 from loguru import logger
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from promptheus.data.models import (
     LearningGoal,
     Lesson,
     LessonStatus,
+    LessonVersion,
     SessionState,
     SkillLevel,
     User,
@@ -138,30 +140,43 @@ class AsyncLessonRepository:
                 logger.warning("Lesson not found", lesson_id=lesson_id)
             return lesson
 
+    async def find_by_slug(self, skill_level: SkillLevel, slug: str) -> Lesson | None:
+        """Find lesson by skill level and slug."""
+        logger.debug("Finding lesson by slug", skill_level=skill_level.value, slug=slug)
+        async with self.session_maker() as session:
+            stmt = select(Lesson).where(Lesson.skill_level == skill_level, Lesson.slug == slug)
+            result = await session.execute(stmt)
+            lesson = result.scalar_one_or_none()
+            if lesson:
+                logger.debug("Lesson found", lesson_id=lesson.id, title=lesson.title)
+            else:
+                logger.debug("Lesson not found", skill_level=skill_level.value, slug=slug)
+            return lesson
+
     async def find_by_skill_level(self, skill_level: SkillLevel) -> list[Lesson]:
         """Find lessons by skill level."""
         logger.debug("Finding lessons by skill level", skill_level=skill_level.value)
         async with self.session_maker() as session:
-            stmt = (
-                select(Lesson).where(Lesson.skill_level == skill_level).order_by(Lesson.order_index)
-            )
+            stmt = select(Lesson).where(Lesson.skill_level == skill_level).order_by(Lesson.position)
             result = await session.execute(stmt)
             lessons = result.scalars().all()
             logger.debug("Lessons found", skill_level=skill_level.value, count=len(lessons))
             return list(lessons)
 
-    async def find_next_lesson(self, skill_level: SkillLevel, current_order: int) -> Lesson | None:
-        """Find next lesson by order index."""
+    async def find_next_lesson(
+        self, skill_level: SkillLevel, current_position: int
+    ) -> Lesson | None:
+        """Find next lesson by position."""
         logger.debug(
             "Finding next lesson",
             skill_level=skill_level.value,
-            current_order=current_order,
+            current_position=current_position,
         )
         async with self.session_maker() as session:
             stmt = (
                 select(Lesson)
-                .where(Lesson.skill_level == skill_level, Lesson.order_index > current_order)
-                .order_by(Lesson.order_index)
+                .where(Lesson.skill_level == skill_level, Lesson.position > current_position)
+                .order_by(Lesson.position)
             )
             result = await session.execute(stmt)
             lesson = result.scalars().first()
@@ -175,7 +190,8 @@ class AsyncLessonRepository:
         self,
         title: str,
         skill_level: SkillLevel,
-        order_index: int,
+        slug: str,
+        position: int,
         tags: list[str],
         theory_content: dict,
         examples: dict,
@@ -186,7 +202,8 @@ class AsyncLessonRepository:
             lesson = Lesson(
                 title=title,
                 skill_level=skill_level,
-                order_index=order_index,
+                slug=slug,
+                position=position,
                 tags=tags,
                 theory_content=theory_content,
                 examples=examples,
@@ -196,6 +213,63 @@ class AsyncLessonRepository:
             await session.flush()
             await session.commit()
             await session.refresh(lesson)  # Refresh to ensure all attributes are loaded
+            return lesson
+
+    async def upsert_lesson(
+        self,
+        title: str,
+        skill_level: SkillLevel,
+        slug: str,
+        position: int,
+        tags: list[str],
+        theory_content: dict,
+        examples: dict,
+        exercises: dict,
+    ) -> Lesson:
+        """Create or update lesson by title (upsert operation)."""
+        logger.debug(
+            "Upserting lesson",
+            title=title,
+            skill_level=skill_level.value,
+            slug=slug,
+            position=position,
+        )
+
+        async with self.session_maker() as session:
+            # Use insert with on_conflict_do_update for upsert
+            stmt = (
+                insert(Lesson)
+                .values(
+                    title=title,
+                    skill_level=skill_level,
+                    slug=slug,
+                    position=position,
+                    tags=tags,
+                    theory_content=theory_content,
+                    examples=examples,
+                    exercises=exercises,
+                )
+                .on_conflict_do_update(
+                    index_elements=["title"],  # Conflict on title (assuming title is unique)
+                    set_={
+                        "skill_level": skill_level,
+                        "slug": slug,
+                        "position": position,
+                        "tags": tags,
+                        "theory_content": theory_content,
+                        "examples": examples,
+                        "exercises": exercises,
+                    },
+                )
+            )
+
+            await session.execute(stmt)
+            await session.commit()
+
+            # Fetch the upserted lesson
+            result = await session.execute(select(Lesson).where(Lesson.title == title))
+            lesson = result.scalar_one()
+            logger.debug("Lesson upserted successfully", title=title, id=lesson.id)
             return lesson
 
 
@@ -422,10 +496,153 @@ class AsyncSessionRepository:
 
             return deleted_count
 
+            return deleted_count
+
     async def _find_by_user_in_session(
         self, session: AsyncSession, user_id: int
     ) -> UserSession | None:
         """Find session by user ID within an existing session."""
         stmt = select(UserSession).where(UserSession.user_id == user_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+
+class AsyncLessonVersionRepository:
+    """Async repository for LessonVersion operations."""
+
+    def __init__(self, session_maker: async_sessionmaker[AsyncSession]) -> None:
+        """Initialize repository."""
+        self.session_maker = session_maker
+
+    async def create(
+        self,
+        lesson_id: int,
+        version: str,
+        content_hash: str,
+        content_snapshot: dict,
+        is_active: bool = False,
+        created_by: str | None = None,
+    ) -> LessonVersion:
+        """Create new lesson version."""
+        logger.info(
+            "Creating lesson version",
+            lesson_id=lesson_id,
+            version=version,
+            content_hash=content_hash[:16],
+            is_active=is_active,
+        )
+        async with self.session_maker() as session:
+            version_obj = LessonVersion(
+                lesson_id=lesson_id,
+                version=version,
+                content_hash=content_hash,
+                content_snapshot=content_snapshot,
+                is_active=is_active,
+                created_by=created_by,
+            )
+            session.add(version_obj)
+            await session.flush()
+            await session.commit()
+            await session.refresh(version_obj)  # Refresh to ensure all attributes are loaded
+            logger.info("Lesson version created", version_id=version_obj.id, lesson_id=lesson_id)
+            return version_obj
+
+    async def find_by_lesson_and_version(
+        self, lesson_id: int, version: str
+    ) -> LessonVersion | None:
+        """Find version by lesson ID and version string."""
+        logger.debug("Finding version", lesson_id=lesson_id, version=version)
+        async with self.session_maker() as session:
+            stmt = select(LessonVersion).where(
+                LessonVersion.lesson_id == lesson_id, LessonVersion.version == version
+            )
+            result = await session.execute(stmt)
+            version_obj = result.scalar_one_or_none()
+            if version_obj:
+                logger.debug("Version found", version_id=version_obj.id)
+            else:
+                logger.debug("Version not found", lesson_id=lesson_id, version=version)
+            return version_obj
+
+    async def find_active_by_lesson(self, lesson_id: int) -> LessonVersion | None:
+        """Find active version for a lesson."""
+        logger.debug("Finding active version", lesson_id=lesson_id)
+        async with self.session_maker() as session:
+            stmt = select(LessonVersion).where(
+                LessonVersion.lesson_id == lesson_id, LessonVersion.is_active.is_(True)
+            )
+            result = await session.execute(stmt)
+            version_obj = result.scalar_one_or_none()
+            if version_obj:
+                logger.debug(
+                    "Active version found", version_id=version_obj.id, version=version_obj.version
+                )
+            else:
+                logger.debug("No active version found", lesson_id=lesson_id)
+            return version_obj
+
+    async def find_all_by_lesson(self, lesson_id: int) -> list[LessonVersion]:
+        """Find all versions for a lesson, ordered by creation time."""
+        logger.debug("Finding all versions for lesson", lesson_id=lesson_id)
+        async with self.session_maker() as session:
+            stmt = (
+                select(LessonVersion)
+                .where(LessonVersion.lesson_id == lesson_id)
+                .order_by(LessonVersion.created_at.desc())
+            )
+            result = await session.execute(stmt)
+            versions = result.scalars().all()
+            logger.debug("Versions found", lesson_id=lesson_id, count=len(versions))
+            return list(versions)
+
+    async def update_active_status(self, version_id: int, is_active: bool) -> None:
+        """Update the active status of a version."""
+        logger.debug("Updating active status", version_id=version_id, is_active=is_active)
+        async with self.session_maker() as session:
+            version_obj = await self._find_by_id_in_session(session, version_id)
+            if version_obj:
+                version_obj.is_active = is_active  # type: ignore
+                await session.commit()
+                logger.info("Active status updated", version_id=version_id, is_active=is_active)
+            else:
+                logger.warning(
+                    "Cannot update active status: version not found", version_id=version_id
+                )
+
+    async def deactivate_other_versions(
+        self, lesson_id: int, keep_version_id: int | None = None
+    ) -> None:
+        """Deactivate all versions for a lesson except the specified one."""
+        logger.debug(
+            "Deactivating other versions", lesson_id=lesson_id, keep_version_id=keep_version_id
+        )
+        async with self.session_maker() as session:
+            # First, set all versions for this lesson to inactive
+            stmt = (
+                select(LessonVersion)
+                .where(LessonVersion.lesson_id == lesson_id)
+                .where(LessonVersion.is_active.is_(True))
+            )
+            result = await session.execute(stmt)
+            active_versions = result.scalars().all()
+
+            for version_obj in active_versions:
+                if keep_version_id is None or version_obj.id != keep_version_id:
+                    version_obj.is_active = False  # type: ignore
+                    logger.debug("Deactivated version", version_id=version_obj.id)
+
+            if active_versions:
+                await session.commit()
+                logger.info(
+                    "Deactivated versions",
+                    lesson_id=lesson_id,
+                    deactivated_count=len(active_versions) - (1 if keep_version_id else 0),
+                )
+
+    async def _find_by_id_in_session(
+        self, session: AsyncSession, version_id: int
+    ) -> LessonVersion | None:
+        """Find version by ID within an existing session."""
+        stmt = select(LessonVersion).where(LessonVersion.id == version_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()

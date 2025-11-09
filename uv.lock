@@ -581,6 +581,7 @@ dependencies = [
     { name = "python-telegram-bot", extra = ["job-queue"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "watchfiles" },
 ]
 
 [package.dev-dependencies]
@@ -609,6 +610,7 @@ requires-dist = [
     { name = "python-telegram-bot", extras = ["job-queue"], specifier = ">=21.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24" },
+    { name = "watchfiles", specifier = ">=0.21" },
 ]
 
 [package.metadata.requires-dev]

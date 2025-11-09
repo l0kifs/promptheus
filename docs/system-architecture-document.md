@@ -232,16 +232,16 @@ User Prompt → Bot Handler → Assessment Engine
 
 ### 5. Technology Mapping
 
-| Layer              | Technologies                                                |
-| ------------------ | ----------------------------------------------------------- |
-| Bot Interface      | python-telegram-bot, asyncio                                |
-| Application Core   | Python 3.11+, Pydantic                                      |
-| AI Integration     | httpx, OpenAI SDK (OpenRouter-compatible)                   |
-| Lesson Management  | Pydantic, watchfiles, semver, hashlib                       |
-| Data Access        | SQLAlchemy (async), Alembic, Dependency Injection Container |
-| Database           | SQLite (MVP) / PostgreSQL (production)                      |
-| Configuration      | python-dotenv, Pydantic Settings                            |
-| Logging            | loguru                                                      |
+| Layer             | Technologies                                                |
+| ----------------- | ----------------------------------------------------------- |
+| Bot Interface     | python-telegram-bot, asyncio                                |
+| Application Core  | Python 3.11+, Pydantic                                      |
+| AI Integration    | httpx, OpenAI SDK (OpenRouter-compatible)                   |
+| Lesson Management | Pydantic, watchfiles, semver, hashlib                       |
+| Data Access       | SQLAlchemy (async), Alembic, Dependency Injection Container |
+| Database          | SQLite (MVP) / PostgreSQL (production)                      |
+| Configuration     | python-dotenv, Pydantic Settings                            |
+| Logging           | loguru                                                      |
 
 ### 6. Scalability Considerations
 

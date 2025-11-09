@@ -43,16 +43,16 @@
 #### 3.1 User
 **Purpose**: Store user identity, skill assessment, and learning preferences
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `telegram_id` | BIGINT | PK, NOT NULL | Telegram user ID (unique identifier) |
-| `username` | VARCHAR(255) | NULL | Telegram username (optional) |
-| `skill_level` | ENUM | NOT NULL, CHECK | `beginner`, `intermediate`, `advanced` |
-| `learning_goal` | ENUM | NOT NULL, CHECK | `academic`, `professional`, `creative` |
-| `current_lesson_id` | INTEGER | FK → Lesson(id), NULL | Current lesson (for resume capability) |
-| `assessment_score` | INTEGER | NULL, CHECK (0-100) | Initial assessment score (0-100) |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Account creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Last update timestamp |
+| Column              | Type         | Constraints             | Description                            |
+| ------------------- | ------------ | ----------------------- | -------------------------------------- |
+| `telegram_id`       | BIGINT       | PK, NOT NULL            | Telegram user ID (unique identifier)   |
+| `username`          | VARCHAR(255) | NULL                    | Telegram username (optional)           |
+| `skill_level`       | ENUM         | NOT NULL, CHECK         | `beginner`, `intermediate`, `advanced` |
+| `learning_goal`     | ENUM         | NOT NULL, CHECK         | `academic`, `professional`, `creative` |
+| `current_lesson_id` | INTEGER      | FK → Lesson(id), NULL   | Current lesson (for resume capability) |
+| `assessment_score`  | INTEGER      | NULL, CHECK (0-100)     | Initial assessment score (0-100)       |
+| `created_at`        | TIMESTAMP    | NOT NULL, DEFAULT NOW() | Account creation timestamp             |
+| `updated_at`        | TIMESTAMP    | NOT NULL, DEFAULT NOW() | Last update timestamp                  |
 
 **Indexes**:
 - PRIMARY KEY: `telegram_id`
@@ -71,20 +71,20 @@
 
 **Note**: Lesson content is managed via private `promptheus-content` repository and loaded automatically from JSON files on application startup.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | SERIAL | PK, NOT NULL | Auto-increment lesson ID |
-| `title` | VARCHAR(255) | NOT NULL, UNIQUE | Lesson title (e.g., "Role Definition") |
-| `slug` | VARCHAR(100) | NOT NULL | URL-safe identifier (e.g., "role-definition") |
-| `skill_level` | ENUM | NOT NULL, CHECK | Target skill level |
-| `position` | INTEGER | NULL | Optional explicit ordering (allows gaps: 10, 20, 30...) |
-| `tags` | JSON | NOT NULL | Array of tags for categorization |
-| `theory_content` | JSON | NOT NULL | Theory sections (text, examples) |
-| `examples` | JSON | NOT NULL | Good/bad prompt comparisons |
-| `exercises` | JSON | NOT NULL | Practice scenarios |
-| `version` | VARCHAR(20) | NOT NULL, DEFAULT '1.0.0' | Current semantic version |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Content creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Last update timestamp |
+| Column           | Type         | Constraints               | Description                                             |
+| ---------------- | ------------ | ------------------------- | ------------------------------------------------------- |
+| `id`             | SERIAL       | PK, NOT NULL              | Auto-increment lesson ID                                |
+| `title`          | VARCHAR(255) | NOT NULL, UNIQUE          | Lesson title (e.g., "Role Definition")                  |
+| `slug`           | VARCHAR(100) | NOT NULL                  | URL-safe identifier (e.g., "role-definition")           |
+| `skill_level`    | ENUM         | NOT NULL, CHECK           | Target skill level                                      |
+| `position`       | INTEGER      | NULL                      | Optional explicit ordering (allows gaps: 10, 20, 30...) |
+| `tags`           | JSON         | NOT NULL                  | Array of tags for categorization                        |
+| `theory_content` | JSON         | NOT NULL                  | Theory sections (text, examples)                        |
+| `examples`       | JSON         | NOT NULL                  | Good/bad prompt comparisons                             |
+| `exercises`      | JSON         | NOT NULL                  | Practice scenarios                                      |
+| `version`        | VARCHAR(20)  | NOT NULL, DEFAULT '1.0.0' | Current semantic version                                |
+| `created_at`     | TIMESTAMP    | NOT NULL, DEFAULT NOW()   | Content creation timestamp                              |
+| `updated_at`     | TIMESTAMP    | NOT NULL, DEFAULT NOW()   | Last update timestamp                                   |
 
 **Indexes**:
 - PRIMARY KEY: `id`
@@ -143,19 +143,19 @@
 #### 3.2.5 LessonVersion
 **Purpose**: Store version history of lesson content changes
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | SERIAL | PK, NOT NULL | Auto-increment version ID |
-| `lesson_id` | INTEGER | FK → Lesson(id), NOT NULL | Lesson reference |
-| `version` | VARCHAR(20) | NOT NULL | Semantic version (e.g., "1.2.3") |
-| `content_hash` | VARCHAR(64) | NOT NULL | SHA-256 hash of content |
-| `theory_content` | JSON | NOT NULL | Theory content snapshot |
-| `examples` | JSON | NOT NULL | Examples snapshot |
-| `exercises` | JSON | NOT NULL | Exercises snapshot |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Version creation timestamp |
-| `created_by` | VARCHAR(100) | NULL | Author/system identifier |
-| `change_description` | VARCHAR(500) | NULL | Optional change description |
-| `is_active` | BOOLEAN | NOT NULL, DEFAULT FALSE | Active version flag |
+| Column               | Type         | Constraints               | Description                      |
+| -------------------- | ------------ | ------------------------- | -------------------------------- |
+| `id`                 | SERIAL       | PK, NOT NULL              | Auto-increment version ID        |
+| `lesson_id`          | INTEGER      | FK → Lesson(id), NOT NULL | Lesson reference                 |
+| `version`            | VARCHAR(20)  | NOT NULL                  | Semantic version (e.g., "1.2.3") |
+| `content_hash`       | VARCHAR(64)  | NOT NULL                  | SHA-256 hash of content          |
+| `theory_content`     | JSON         | NOT NULL                  | Theory content snapshot          |
+| `examples`           | JSON         | NOT NULL                  | Examples snapshot                |
+| `exercises`          | JSON         | NOT NULL                  | Exercises snapshot               |
+| `created_at`         | TIMESTAMP    | NOT NULL, DEFAULT NOW()   | Version creation timestamp       |
+| `created_by`         | VARCHAR(100) | NULL                      | Author/system identifier         |
+| `change_description` | VARCHAR(500) | NULL                      | Optional change description      |
+| `is_active`          | BOOLEAN      | NOT NULL, DEFAULT FALSE   | Active version flag              |
 
 **Indexes**:
 - PRIMARY KEY: `id`
@@ -176,15 +176,15 @@
 #### 3.3 UserProgress
 **Purpose**: Track user advancement through lessons
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | SERIAL | PK, NOT NULL | Auto-increment progress ID |
-| `user_id` | BIGINT | FK → User(telegram_id), NOT NULL | User reference |
-| `lesson_id` | INTEGER | FK → Lesson(id), NOT NULL | Lesson reference |
-| `status` | ENUM | NOT NULL, DEFAULT 'not_started' | `not_started`, `in_progress`, `completed` |
-| `attempts` | INTEGER | NOT NULL, DEFAULT 0 | Number of exercise attempts |
-| `last_score` | INTEGER | NULL, CHECK (0-100) | Most recent exercise score (0-100) |
-| `completed_at` | TIMESTAMP | NULL | Completion timestamp |
+| Column         | Type      | Constraints                      | Description                               |
+| -------------- | --------- | -------------------------------- | ----------------------------------------- |
+| `id`           | SERIAL    | PK, NOT NULL                     | Auto-increment progress ID                |
+| `user_id`      | BIGINT    | FK → User(telegram_id), NOT NULL | User reference                            |
+| `lesson_id`    | INTEGER   | FK → Lesson(id), NOT NULL        | Lesson reference                          |
+| `status`       | ENUM      | NOT NULL, DEFAULT 'not_started'  | `not_started`, `in_progress`, `completed` |
+| `attempts`     | INTEGER   | NOT NULL, DEFAULT 0              | Number of exercise attempts               |
+| `last_score`   | INTEGER   | NULL, CHECK (0-100)              | Most recent exercise score (0-100)        |
+| `completed_at` | TIMESTAMP | NULL                             | Completion timestamp                      |
 
 **Indexes**:
 - PRIMARY KEY: `id`
@@ -207,12 +207,12 @@
 #### 3.4 UserSession
 **Purpose**: Manage active conversation state and context
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `user_id` | BIGINT | PK, FK → User(telegram_id), NOT NULL | User reference (one session per user) |
-| `state` | ENUM | NOT NULL | `onboarding`, `learning`, `practicing`, `menu` |
-| `context_data` | JSON | NOT NULL, DEFAULT '{}' | State-specific context |
-| `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Last activity timestamp |
+| Column         | Type      | Constraints                          | Description                                    |
+| -------------- | --------- | ------------------------------------ | ---------------------------------------------- |
+| `user_id`      | BIGINT    | PK, FK → User(telegram_id), NOT NULL | User reference (one session per user)          |
+| `state`        | ENUM      | NOT NULL                             | `onboarding`, `learning`, `practicing`, `menu` |
+| `context_data` | JSON      | NOT NULL, DEFAULT '{}'               | State-specific context                         |
+| `updated_at`   | TIMESTAMP | NOT NULL, DEFAULT NOW()              | Last activity timestamp                        |
 
 **Indexes**:
 - PRIMARY KEY: `user_id`
@@ -334,13 +334,13 @@ WHERE updated_at > NOW() - INTERVAL '7 days';
 ### 5. Migration Strategy
 
 #### 5.1 SQLite → PostgreSQL Differences
-| Feature | SQLite | PostgreSQL |
-|---------|--------|------------|
-| ENUM types | TEXT + CHECK constraint | Native ENUM type |
-| JSON indexing | N/A | GIN index support |
-| Concurrent writes | Limited (file lock) | Full ACID support |
-| Timestamp | TEXT/INTEGER | TIMESTAMP WITH TIME ZONE |
-| ON CONFLICT | Limited | Full upsert support |
+| Feature           | SQLite                  | PostgreSQL               |
+| ----------------- | ----------------------- | ------------------------ |
+| ENUM types        | TEXT + CHECK constraint | Native ENUM type         |
+| JSON indexing     | N/A                     | GIN index support        |
+| Concurrent writes | Limited (file lock)     | Full ACID support        |
+| Timestamp         | TEXT/INTEGER            | TIMESTAMP WITH TIME ZONE |
+| ON CONFLICT       | Limited                 | Full upsert support      |
 
 #### 5.2 Migration Steps
 1. Export data from SQLite using SQLAlchemy

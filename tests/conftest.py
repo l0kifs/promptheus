@@ -129,11 +129,13 @@ async def async_sample_lesson(async_db_session: AsyncSession) -> Lesson:
     import random
 
     title = f"Async Test Lesson {random.randint(10000, 99999)}"
-    order_index = random.randint(1000, 9999)  # Use random order_index to avoid conflicts
+    slug = f"async-test-lesson-{random.randint(10000, 99999)}"
+    position = random.randint(1000, 9999)  # Use random position to avoid conflicts
     lesson = Lesson(
         title=title,
         skill_level=SkillLevel.BEGINNER,
-        order_index=order_index,
+        slug=slug,
+        position=position,
         tags=["test", "beginner"],
         theory_content={"sections": [{"content": "Test theory"}]},
         examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},
@@ -151,11 +153,13 @@ async def async_sample_lesson_id(async_db_session: AsyncSession) -> int:
     import random
 
     title = f"Async Test Lesson {random.randint(10000, 99999)}"
-    order_index = random.randint(1000, 9999)  # Use random order_index to avoid conflicts
+    slug = f"async-test-lesson-{random.randint(10000, 99999)}"
+    position = random.randint(1000, 9999)  # Use random position to avoid conflicts
     lesson = Lesson(
         title=title,
         skill_level=SkillLevel.BEGINNER,
-        order_index=order_index,
+        slug=slug,
+        position=position,
         tags=["test", "beginner"],
         theory_content={"sections": [{"content": "Test theory"}]},
         examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},
@@ -175,11 +179,13 @@ async def async_multiple_lessons(async_db_session: AsyncSession) -> list[Lesson]
     lessons = []
     for i in range(1, 4):
         title = f"Async Test Lesson {random.randint(10000, 99999)} {i}"
-        order_index = random.randint(10000, 20000) + i  # Use random order_index to avoid conflicts
+        slug = f"async-test-lesson-{random.randint(10000, 99999)}-{i}"
+        position = random.randint(10000, 20000) + i  # Use random position to avoid conflicts
         lesson = Lesson(
             title=title,
             skill_level=SkillLevel.BEGINNER,
-            order_index=order_index,
+            slug=slug,
+            position=position,
             tags=["test", "beginner"],
             theory_content={"sections": [{"content": "Test theory"}]},
             examples={"comparisons": [{"bad": "Bad example", "good": "Good example"}]},

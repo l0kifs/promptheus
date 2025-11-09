@@ -137,30 +137,43 @@ class AsyncLessonRepository:
                 logger.warning("Lesson not found", lesson_id=lesson_id)
             return lesson
 
+    async def find_by_slug(self, skill_level: SkillLevel, slug: str) -> Lesson | None:
+        """Find lesson by skill level and slug."""
+        logger.debug("Finding lesson by slug", skill_level=skill_level.value, slug=slug)
+        async with self.session_maker() as session:
+            stmt = select(Lesson).where(Lesson.skill_level == skill_level, Lesson.slug == slug)
+            result = await session.execute(stmt)
+            lesson = result.scalar_one_or_none()
+            if lesson:
+                logger.debug("Lesson found", lesson_id=lesson.id, title=lesson.title)
+            else:
+                logger.debug("Lesson not found", skill_level=skill_level.value, slug=slug)
+            return lesson
+
     async def find_by_skill_level(self, skill_level: SkillLevel) -> list[Lesson]:
         """Find lessons by skill level."""
         logger.debug("Finding lessons by skill level", skill_level=skill_level.value)
         async with self.session_maker() as session:
-            stmt = (
-                select(Lesson).where(Lesson.skill_level == skill_level).order_by(Lesson.order_index)
-            )
+            stmt = select(Lesson).where(Lesson.skill_level == skill_level).order_by(Lesson.position)
             result = await session.execute(stmt)
             lessons = result.scalars().all()
             logger.debug("Lessons found", skill_level=skill_level.value, count=len(lessons))
             return list(lessons)
 
-    async def find_next_lesson(self, skill_level: SkillLevel, current_order: int) -> Lesson | None:
-        """Find next lesson by order index."""
+    async def find_next_lesson(
+        self, skill_level: SkillLevel, current_position: int
+    ) -> Lesson | None:
+        """Find next lesson by position."""
         logger.debug(
             "Finding next lesson",
             skill_level=skill_level.value,
-            current_order=current_order,
+            current_position=current_position,
         )
         async with self.session_maker() as session:
             stmt = (
                 select(Lesson)
-                .where(Lesson.skill_level == skill_level, Lesson.order_index > current_order)
-                .order_by(Lesson.order_index)
+                .where(Lesson.skill_level == skill_level, Lesson.position > current_position)
+                .order_by(Lesson.position)
             )
             result = await session.execute(stmt)
             lesson = result.scalars().first()
@@ -174,7 +187,8 @@ class AsyncLessonRepository:
         self,
         title: str,
         skill_level: SkillLevel,
-        order_index: int,
+        slug: str,
+        position: int,
         tags: list[str],
         theory_content: dict,
         examples: dict,
@@ -185,7 +199,8 @@ class AsyncLessonRepository:
             lesson = Lesson(
                 title=title,
                 skill_level=skill_level,
-                order_index=order_index,
+                slug=slug,
+                position=position,
                 tags=tags,
                 theory_content=theory_content,
                 examples=examples,
@@ -201,7 +216,8 @@ class AsyncLessonRepository:
         self,
         title: str,
         skill_level: SkillLevel,
-        order_index: int,
+        slug: str,
+        position: int,
         tags: list[str],
         theory_content: dict,
         examples: dict,
@@ -209,7 +225,11 @@ class AsyncLessonRepository:
     ) -> Lesson:
         """Create or update lesson by title (upsert operation)."""
         logger.debug(
-            "Upserting lesson", title=title, skill_level=skill_level.value, order_index=order_index
+            "Upserting lesson",
+            title=title,
+            skill_level=skill_level.value,
+            slug=slug,
+            position=position,
         )
 
         async with self.session_maker() as session:
@@ -219,7 +239,8 @@ class AsyncLessonRepository:
                 .values(
                     title=title,
                     skill_level=skill_level,
-                    order_index=order_index,
+                    slug=slug,
+                    position=position,
                     tags=tags,
                     theory_content=theory_content,
                     examples=examples,
@@ -230,7 +251,8 @@ class AsyncLessonRepository:
                     index_elements=["title"],  # Conflict on title (assuming title is unique)
                     set_={
                         "skill_level": skill_level,
-                        "order_index": order_index,
+                        "slug": slug,
+                        "position": position,
                         "tags": tags,
                         "theory_content": theory_content,
                         "examples": examples,

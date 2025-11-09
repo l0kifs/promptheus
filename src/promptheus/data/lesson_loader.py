@@ -1,6 +1,7 @@
 """Lesson loader service for loading lessons from JSON files."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,50 @@ from loguru import logger
 from promptheus.config import get_settings
 from promptheus.data.async_repositories import AsyncLessonRepository
 from promptheus.data.schemas import LessonContentSchema
+
+
+def generate_slug(title: str, max_length: int = 100) -> str:
+    """Generate URL-safe slug from title.
+
+    Converts title to lowercase, replaces spaces with hyphens,
+    removes special characters, and ensures uniqueness.
+
+    Args:
+        title: The lesson title to convert
+        max_length: Maximum length of the slug (default: 100)
+
+    Returns:
+        URL-safe slug string
+
+    Examples:
+        >>> generate_slug("Introduction to Prompt Engineering")
+        'introduction-to-prompt-engineering'
+        >>> generate_slug("Advanced Techniques & Best Practices")
+        'advanced-techniques-best-practices'
+    """
+    if not title:
+        return ""
+
+    # Convert to lowercase
+    slug = title.lower()
+
+    # Replace spaces and underscores with hyphens
+    slug = re.sub(r"[_\s]+", "-", slug)
+
+    # Remove special characters, keeping only alphanumeric and hyphens
+    slug = re.sub(r"[^a-z0-9-]", "", slug)
+
+    # Remove consecutive hyphens
+    slug = re.sub(r"-+", "-", slug)
+
+    # Remove leading/trailing hyphens
+    slug = slug.strip("-")
+
+    # Truncate to max length
+    if len(slug) > max_length:
+        slug = slug[:max_length].rstrip("-")
+
+    return slug
 
 
 class LessonLoaderService:
@@ -210,19 +255,25 @@ class LessonLoaderService:
                 "Processing skill level", skill_level=skill_level, file_count=len(file_paths)
             )
 
-            for file_path in file_paths:
+            for index, file_path in enumerate(file_paths, 1):
                 try:
                     # Load and validate lesson
                     schema = await self.load_lesson(file_path)
 
-                    # Determine order index from filename (assuming format like "01_title.json")
-                    order_index = self._extract_order_index(file_path)
+                    # Generate slug from title
+                    slug = generate_slug(schema.title)
+                    if not slug:
+                        raise ValueError(f"Cannot generate slug for title: {schema.title}")
+
+                    # Calculate position from file order (10, 20, 30, etc. for easy insertion)
+                    position = index * 10
 
                     # Upsert to database
                     await self.lesson_repo.upsert_lesson(
                         title=schema.title,
                         skill_level=schema.skill_level,
-                        order_index=order_index,
+                        slug=slug,
+                        position=position,
                         tags=schema.tags,
                         theory_content=schema.theory_content.model_dump(),
                         examples=schema.examples.model_dump(),
@@ -234,7 +285,8 @@ class LessonLoaderService:
                         "Lesson upserted successfully",
                         title=schema.title,
                         skill_level=skill_level,
-                        order_index=order_index,
+                        slug=slug,
+                        position=position,
                     )
 
                 except Exception as e:
@@ -262,7 +314,8 @@ class LessonLoaderService:
     def _extract_order_index(self, file_path: Path) -> int:
         """Extract order index from filename.
 
-        Assumes filename format like "01_title.json" where 01 is the order index.
+        DEPRECATED: This method is kept for backward compatibility
+        but is no longer used since we switched to slug-based identification.
 
         Args:
             file_path: Path to the lesson file

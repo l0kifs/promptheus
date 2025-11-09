@@ -124,7 +124,8 @@ class Lesson(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String(255), nullable=False, unique=True)
     skill_level = Column(Enum(SkillLevel), nullable=False, index=True)
-    order_index = Column(Integer, nullable=False)
+    slug = Column(String(100), nullable=False)
+    position = Column(Integer, nullable=True)
     tags = Column(JSON, nullable=False)
     theory_content = Column(JSON, nullable=False)
     examples = Column(JSON, nullable=False)
@@ -132,8 +133,8 @@ class Lesson(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     __table_args__ = (
-        UniqueConstraint("skill_level", "order_index", name="uq_lesson_skill_level_order_index"),
-        Index("ix_lesson_skill_level_order_index", "skill_level", "order_index"),
+        UniqueConstraint("skill_level", "slug", name="uq_lesson_skill_level_slug"),
+        Index("ix_lesson_skill_level_slug", "skill_level", "slug"),
     )
 
     # Relationships

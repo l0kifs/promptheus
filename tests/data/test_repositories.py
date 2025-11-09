@@ -96,7 +96,8 @@ class TestLessonRepository:
         lesson = await repo.create(
             title="New Lesson",
             skill_level=SkillLevel.INTERMEDIATE,
-            order_index=1,
+            slug="new-lesson",
+            position=10,
             tags=["test"],
             theory_content={"sections": []},
             examples={"comparisons": []},
@@ -105,6 +106,8 @@ class TestLessonRepository:
 
         assert lesson.title == "New Lesson"
         assert lesson.skill_level == SkillLevel.INTERMEDIATE
+        assert lesson.slug == "new-lesson"
+        assert lesson.position == 10
 
         # Verify in database
         db_lesson = await async_db_session.scalar(
@@ -119,6 +122,14 @@ class TestLessonRepository:
         assert lesson is not None
         assert lesson.title == async_sample_lesson.title  # type: ignore
 
+    async def test_find_by_slug(self, repo, async_sample_lesson: Lesson):
+        """Test finding lesson by slug and skill level."""
+        lesson = await repo.find_by_slug(async_sample_lesson.skill_level, async_sample_lesson.slug)
+
+        assert lesson is not None
+        assert lesson.id == async_sample_lesson.id
+        assert lesson.slug == async_sample_lesson.slug
+
     async def test_find_by_skill_level(self, repo, async_multiple_lessons):
         """Test finding lessons by skill level."""
         lessons = await repo.find_by_skill_level(SkillLevel.BEGINNER)
@@ -129,16 +140,16 @@ class TestLessonRepository:
 
     async def test_find_next_lesson(self, repo, async_multiple_lessons):
         """Test finding next lesson in sequence."""
-        # Sort the fixture lessons by order_index to find the expected next one
-        sorted_lessons = sorted(async_multiple_lessons, key=lambda lesson: lesson.order_index)
+        # Sort the fixture lessons by position to find the expected next one
+        sorted_lessons = sorted(async_multiple_lessons, key=lambda lesson: lesson.position)
         first_lesson = sorted_lessons[0]
 
         # Find the next lesson using the repo method
-        next_lesson = await repo.find_next_lesson(SkillLevel.BEGINNER, first_lesson.order_index)
+        next_lesson = await repo.find_next_lesson(SkillLevel.BEGINNER, first_lesson.position)
 
         if next_lesson:
-            # The next lesson should have order_index > first_lesson.order_index
-            assert next_lesson.order_index > first_lesson.order_index
+            # The next lesson should have position > first_lesson.position
+            assert next_lesson.position > first_lesson.position
             # The next lesson should be for BEGINNER skill level
             assert next_lesson.skill_level == SkillLevel.BEGINNER
 

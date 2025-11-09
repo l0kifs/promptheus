@@ -229,6 +229,21 @@ class TestPracticeHandlers:
             return_value=session_context
         )
 
+        # Mock lesson with exercises
+        mock_lesson = mocker.Mock()
+        mock_lesson.exercises = {
+            "scenarios": [{"scenario": "Test scenario", "task": "Test task"}]
+        }
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
+
+        # Mock user
+        mock_user = mocker.Mock()
+        mock_user.skill_level = mocker.Mock()
+        mock_user.skill_level.value = "beginner"
+        mock_user.learning_goal = mocker.Mock()
+        mock_user.learning_goal.value = "academic"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
+
         # Mock AI evaluation
         feedback = {
             "score": 8,
@@ -241,6 +256,7 @@ class TestPracticeHandlers:
 
         # Mock progress tracking
         mock_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
+        mock_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
         mock_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
 
         # Mock message operations
@@ -256,13 +272,19 @@ class TestPracticeHandlers:
 
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
-        # Verify AI evaluation called
-        mock_handlers.assessment_engine.evaluate_user_prompt.assert_called_once_with(user_prompt, 1)
+        # Verify AI evaluation called with exercise context
+        mock_handlers.assessment_engine.evaluate_user_prompt.assert_called_once_with(
+            user_prompt=user_prompt,
+            lesson_id=1,
+            exercise_scenario="Test scenario",
+            exercise_task="Test task",
+            skill_level="beginner",
+            learning_goal="academic",
+        )
 
-        # Verify progress incremented
+        # Verify progress methods called
         mock_handlers.progress_tracker.increment_attempts.assert_called_once_with(12345, 1)
-
-        # Verify lesson completed (score >= 7)
+        mock_handlers.progress_tracker.record_attempt.assert_called_once_with(12345, 1, 8)
         mock_handlers.progress_tracker.complete_lesson.assert_called_once_with(12345, 1, 8)
 
         # Verify typing indicator was sent
@@ -337,6 +359,11 @@ class TestPracticeHandlers:
             return_value=session_context
         )
 
+        # Mock lesson
+        mock_lesson = mocker.Mock()
+        mock_lesson.exercises = {"scenarios": []}
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
+
         # Mock AI evaluation failure
         mock_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
             side_effect=Exception("AI Error")
@@ -371,6 +398,21 @@ class TestPracticeHandlers:
             return_value=session_context
         )
 
+        # Mock lesson with exercises
+        mock_lesson = mocker.Mock()
+        mock_lesson.exercises = {
+            "scenarios": [{"scenario": "Test scenario", "task": "Test task"}]
+        }
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
+
+        # Mock user
+        mock_user = mocker.Mock()
+        mock_user.skill_level = mocker.Mock()
+        mock_user.skill_level.value = "beginner"
+        mock_user.learning_goal = mocker.Mock()
+        mock_user.learning_goal.value = "academic"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
+
         # Mock AI evaluation with low score
         feedback = {"score": 5, "strengths": [], "improvements": ["Add more details"]}
         mock_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
@@ -379,6 +421,8 @@ class TestPracticeHandlers:
 
         # Mock progress tracking
         mock_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()
+        mock_handlers.progress_tracker.record_attempt = mocker.AsyncMock()
+        mock_handlers.progress_tracker.complete_lesson = mocker.AsyncMock()
 
         # Mock message operations
         mock_text_update.message.reply_text = mocker.AsyncMock()
@@ -393,8 +437,9 @@ class TestPracticeHandlers:
 
         await mock_handlers.text_message_handler(mock_text_update, mock_context)
 
-        # Verify progress incremented but lesson not completed
+        # Verify progress methods called
         mock_handlers.progress_tracker.increment_attempts.assert_called_once_with(12345, 1)
+        mock_handlers.progress_tracker.record_attempt.assert_called_once_with(12345, 1, 5)
         mock_handlers.progress_tracker.complete_lesson.assert_not_called()
 
         # Verify feedback with try again option
@@ -434,6 +479,21 @@ class TestPracticeHandlers:
         mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
             return_value=session_context
         )
+
+        # Mock lesson with exercises
+        mock_lesson = mocker.Mock()
+        mock_lesson.exercises = {
+            "scenarios": [{"scenario": "Test scenario", "task": "Test task"}]
+        }
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
+
+        # Mock user
+        mock_user = mocker.Mock()
+        mock_user.skill_level = mocker.Mock()
+        mock_user.skill_level.value = "beginner"
+        mock_user.learning_goal = mocker.Mock()
+        mock_user.learning_goal.value = "academic"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
 
         # Mock AI evaluation with low score (below completion threshold)
         feedback = {"score": 3, "strengths": [], "improvements": ["Be more specific"]}
@@ -484,6 +544,21 @@ class TestPracticeHandlers:
             return_value=session_context
         )
 
+        # Mock lesson with exercises
+        mock_lesson = mocker.Mock()
+        mock_lesson.exercises = {
+            "scenarios": [{"scenario": "Test scenario", "task": "Test task"}]
+        }
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
+
+        # Mock user
+        mock_user = mocker.Mock()
+        mock_user.skill_level = mocker.Mock()
+        mock_user.skill_level.value = "beginner"
+        mock_user.learning_goal = mocker.Mock()
+        mock_user.learning_goal.value = "academic"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
+
         # Mock AI evaluation with high score (above completion threshold)
         feedback = {"score": 9, "strengths": ["Excellent detail"], "improvements": []}
         mock_handlers.assessment_engine.evaluate_user_prompt = mocker.AsyncMock(
@@ -531,6 +606,21 @@ class TestPracticeHandlers:
         mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
             return_value=session_context
         )
+
+        # Mock lesson with exercises
+        mock_lesson = mocker.Mock()
+        mock_lesson.exercises = {
+            "scenarios": [{"scenario": "Test scenario", "task": "Test task"}]
+        }
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
+
+        # Mock user
+        mock_user = mocker.Mock()
+        mock_user.skill_level = mocker.Mock()
+        mock_user.skill_level.value = "beginner"
+        mock_user.learning_goal = mocker.Mock()
+        mock_user.learning_goal.value = "academic"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
 
         # Mock AI evaluation with threshold score
         feedback = {"score": 7, "strengths": ["Good effort"], "improvements": ["Minor tweaks"]}
@@ -580,6 +670,21 @@ class TestPracticeHandlers:
         mock_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
             return_value=session_context
         )
+
+        # Mock lesson with exercises
+        mock_lesson = mocker.Mock()
+        mock_lesson.exercises = {
+            "scenarios": [{"scenario": "Test scenario", "task": "Test task"}]
+        }
+        mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
+
+        # Mock user
+        mock_user = mocker.Mock()
+        mock_user.skill_level = mocker.Mock()
+        mock_user.skill_level.value = "beginner"
+        mock_user.learning_goal = mocker.Mock()
+        mock_user.learning_goal.value = "academic"
+        mock_handlers.learning_orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
 
         # Mock progress tracking
         mock_handlers.progress_tracker.increment_attempts = mocker.AsyncMock()

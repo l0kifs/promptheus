@@ -3,6 +3,8 @@
 import pytest
 from telegram import Update
 
+from promptheus.data.models import SkillLevel, LearningGoal
+
 
 class TestLessonFlowE2E:
     """E2E tests for complete lesson learning flow."""
@@ -63,15 +65,21 @@ class TestLessonFlowE2E:
             ],
         )
 
-        # Mock learning orchestrator methods
-        bot_handlers.learning_orchestrator.get_session_context = mocker.AsyncMock(
-            return_value={"lesson_step": "practice", "current_lesson_id": 1}
-        )
-        bot_handlers.learning_orchestrator.save_session_context = mocker.AsyncMock()
+        # Mock learning orchestrator methods with dynamic session context
+        session_contexts = {}
+        
+        async def mock_get_session_context(user_id):
+            return session_contexts.get(user_id, {"lesson_step": "practice", "current_lesson_id": 1})
+        
+        async def mock_save_session_context(user_id, context):
+            session_contexts[user_id] = context
+        
+        bot_handlers.learning_orchestrator.get_session_context = mock_get_session_context
+        bot_handlers.learning_orchestrator.save_session_context = mock_save_session_context
         bot_handlers.learning_orchestrator.update_session_state = mocker.AsyncMock()
 
         # Mock existing user
-        mock_user = type("MockUser", (), {"skill_level": "beginner"})()
+        mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER, "learning_goal": LearningGoal.ACADEMIC})()
         mock_user_repo.find_by_telegram_id.return_value = mock_user
 
         # Mock lesson data

@@ -164,11 +164,15 @@ class TestAssessmentEngine:
     @pytest.mark.asyncio
     async def test_evaluate_answers_invalid_question_count(self, engine):
         """Test that evaluation fails if question count is not 5."""
+        from promptheus.core.exceptions import AssessmentError
+
         # Temporarily modify questions to have wrong count
         original_questions = engine.get_assessment_questions
         engine.get_assessment_questions = lambda: []  # Empty list
 
-        with pytest.raises(ValueError, match="Assessment must have exactly 5 questions"):
+        with pytest.raises(
+            AssessmentError, match="Invalid assessment configuration: expected 5 questions"
+        ):
             await engine.evaluate_answers(["A", "B", "C", "A", "B"])
 
         # Restore original method
@@ -406,10 +410,11 @@ class TestProgressTracker:
 
         await tracker.mark_completed(user_id, lesson_id, score)
 
-        # Verify the progress was updated
-        assert mock_progress.status == LessonStatus.COMPLETED
-        assert mock_progress.last_score == score
-        assert mock_progress.completed_at is not None
+        # Verify the repository methods were called correctly
+        tracker.progress_repo.update_status.assert_called_once_with(
+            user_id, lesson_id, LessonStatus.COMPLETED
+        )
+        tracker.progress_repo.update_score.assert_called_once_with(user_id, lesson_id, score)
 
     @pytest.mark.asyncio
     async def test_record_attempt(self, tracker):
@@ -469,9 +474,9 @@ class TestLearningFlowOrchestrator:
         # Mock user and lessons
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
         mock_lessons = [
-            type("MockLesson", (), {"id": 1, "title": "Lesson 1", "order_index": 1})(),
-            type("MockLesson", (), {"id": 2, "title": "Lesson 2", "order_index": 2})(),
-            type("MockLesson", (), {"id": 3, "title": "Lesson 3", "order_index": 3})(),
+            type("MockLesson", (), {"id": 1, "title": "Lesson 1", "position": 1})(),
+            type("MockLesson", (), {"id": 2, "title": "Lesson 2", "position": 2})(),
+            type("MockLesson", (), {"id": 3, "title": "Lesson 3", "position": 3})(),
         ]
 
         orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
@@ -492,9 +497,9 @@ class TestLearningFlowOrchestrator:
 
         # Mock user and lessons
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
-        mock_current_lesson = type("MockLesson", (), {"order_index": 1})()
+        mock_current_lesson = type("MockLesson", (), {"position": 1})()
         mock_next_lesson = type(
-            "MockLesson", (), {"id": 2, "title": "Lesson 2", "order_index": 2}
+            "MockLesson", (), {"id": 2, "title": "Lesson 2", "position": 2}
         )()
 
         orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
@@ -515,7 +520,7 @@ class TestLearningFlowOrchestrator:
 
         # Mock user and lessons
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
-        mock_current_lesson = type("MockLesson", (), {"order_index": 3})()
+        mock_current_lesson = type("MockLesson", (), {"position": 3})()
 
         orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
         orchestrator.lesson_repo.find_by_id.return_value = mock_current_lesson

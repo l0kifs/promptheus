@@ -32,12 +32,34 @@ class TestTagEnum:
     def test_tag_values_list(self):
         """Test that all tag values are accessible."""
         expected = [
-            "academic", "advanced-reasoning", "automation", "clear-objectives",
-            "complex-tasks", "constraints", "context-heavy", "context-management",
-            "context-provision", "creative", "examples", "formatting", "general",
-            "meta-prompting", "optimization", "output-formatting", "pattern-recognition",
-            "persona", "perspective", "problem-solving", "professional", "reasoning",
-            "refinement", "robustness", "role-based", "role-definition", "testing", "workflows"
+            "academic",
+            "advanced-reasoning",
+            "automation",
+            "clear-objectives",
+            "complex-tasks",
+            "constraints",
+            "context-heavy",
+            "context-management",
+            "context-provision",
+            "creative",
+            "examples",
+            "formatting",
+            "general",
+            "meta-prompting",
+            "optimization",
+            "output-formatting",
+            "pattern-recognition",
+            "persona",
+            "perspective",
+            "problem-solving",
+            "professional",
+            "reasoning",
+            "refinement",
+            "robustness",
+            "role-based",
+            "role-definition",
+            "testing",
+            "workflows",
         ]
         actual = [tag.value for tag in Tag]
         assert actual == expected
@@ -273,9 +295,7 @@ class TestLessonContentSchema:
             "title": "Test Lesson",
             "skill_level": "beginner",
             "tags": ["general"],
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -309,9 +329,7 @@ class TestLessonContentSchema:
             "title": "Test Lesson",
             "skill_level": "beginner",
             "tags": ["general"],
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -347,9 +365,7 @@ class TestLessonContentSchema:
             "skill_level": "beginner",
             "tags": ["general"],
             "version": custom_version,
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -379,9 +395,7 @@ class TestLessonContentSchema:
             "title": "",
             "skill_level": "beginner",
             "tags": ["general"],
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -412,9 +426,7 @@ class TestLessonContentSchema:
             "title": "Test Lesson",
             "skill_level": "expert",  # Invalid
             "tags": ["general"],
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -445,9 +457,7 @@ class TestLessonContentSchema:
             "title": "Test Lesson",
             "skill_level": "beginner",
             "tags": [],  # Empty
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -478,9 +488,7 @@ class TestLessonContentSchema:
             "title": "Test Lesson",
             "skill_level": "beginner",
             "tags": ["invalid_tag"],  # Invalid tag
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -511,9 +519,7 @@ class TestLessonContentSchema:
             "title": "Test Lesson",
             "skill_level": "beginner",
             "tags": ["general"],
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -540,32 +546,32 @@ class TestLessonContentSchema:
 
     def test_from_json_string_method(self):
         """Test from_json with JSON string."""
-        json_string = json.dumps({
-            "title": "Test Lesson",
-            "skill_level": "beginner",
-            "tags": ["general"],
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
-            "examples": {
-                "comparisons": [
-                    {
-                        "bad": "Bad",
-                        "bad_reason": "Reason",
-                        "good": "Good",
-                        "good_reason": "Reason",
-                    }
-                ]
-            },
-            "exercises": {
-                "scenarios": [
-                    {
-                        "scenario": "Scenario",
-                        "task": "Task",
-                    }
-                ]
-            },
-        })
+        json_string = json.dumps(
+            {
+                "title": "Test Lesson",
+                "skill_level": "beginner",
+                "tags": ["general"],
+                "theory_content": {"sections": [{"content": "Content"}]},
+                "examples": {
+                    "comparisons": [
+                        {
+                            "bad": "Bad",
+                            "bad_reason": "Reason",
+                            "good": "Good",
+                            "good_reason": "Reason",
+                        }
+                    ]
+                },
+                "exercises": {
+                    "scenarios": [
+                        {
+                            "scenario": "Scenario",
+                            "task": "Task",
+                        }
+                    ]
+                },
+            }
+        )
 
         lesson = LessonContentSchema.from_json(json_string)
         assert lesson.title == "Test Lesson"
@@ -577,9 +583,7 @@ class TestLessonContentSchema:
             "title": "Test Lesson",
             "skill_level": "beginner",
             "tags": ["general"],
-            "theory_content": {
-                "sections": [{"content": "Content"}]
-            },
+            "theory_content": {"sections": [{"content": "Content"}]},
             "examples": {
                 "comparisons": [
                     {
@@ -612,20 +616,26 @@ class TestLessonContentSchema:
 class TestRealLessonValidation:
     """Test validation with real lesson JSON files."""
 
-    @pytest.mark.parametrize("lesson_file", [
-        "01_introduction_to_prompt_engineering.json",
-        "02_defining_ai_roles.json",
-        "03_providing_context.json",
-        "04_setting_clear_objectives.json",
-        "05_specifying_output_format.json",
-    ])
+    @pytest.mark.parametrize(
+        "lesson_file",
+        [
+            "01_introduction_to_prompt_engineering.json",
+            "02_defining_ai_roles.json",
+            "03_providing_context.json",
+            "04_setting_clear_objectives.json",
+            "05_specifying_output_format.json",
+        ],
+    )
     def test_beginner_lessons_validate(self, lesson_file):
         """Test that all beginner lessons validate successfully."""
         import os
-        file_path = f"/home/serj/dev/my-github-repos/promptheus-content/lessons/beginner/{lesson_file}"
+
+        file_path = (
+            f"/home/serj/dev/my-github-repos/promptheus-content/lessons/beginner/{lesson_file}"
+        )
 
         if os.path.exists(file_path):
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 lesson_data = json.load(f)
 
             # Should not raise any validation errors
@@ -634,16 +644,22 @@ class TestRealLessonValidation:
             assert lesson.skill_level == SkillLevel.BEGINNER
             assert len(lesson.tags) > 0
 
-    @pytest.mark.parametrize("lesson_file", [
-        "06_chain_of_thought_prompting.json",
-    ])
+    @pytest.mark.parametrize(
+        "lesson_file",
+        [
+            "06_chain_of_thought_prompting.json",
+        ],
+    )
     def test_intermediate_lessons_validate(self, lesson_file):
         """Test that intermediate lessons validate successfully."""
         import os
-        file_path = f"/home/serj/dev/my-github-repos/promptheus-content/lessons/intermediate/{lesson_file}"
+
+        file_path = (
+            f"/home/serj/dev/my-github-repos/promptheus-content/lessons/intermediate/{lesson_file}"
+        )
 
         if os.path.exists(file_path):
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 lesson_data = json.load(f)
 
             # Should not raise any validation errors

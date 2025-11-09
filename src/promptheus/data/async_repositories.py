@@ -1,9 +1,8 @@
-"""Async repository pattern for data access."""
-
 from datetime import datetime
 
 from loguru import logger
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from promptheus.data.models import (
@@ -196,6 +195,58 @@ class AsyncLessonRepository:
             await session.flush()
             await session.commit()
             await session.refresh(lesson)  # Refresh to ensure all attributes are loaded
+            return lesson
+
+    async def upsert_lesson(
+        self,
+        title: str,
+        skill_level: SkillLevel,
+        order_index: int,
+        tags: list[str],
+        theory_content: dict,
+        examples: dict,
+        exercises: dict,
+    ) -> Lesson:
+        """Create or update lesson by title (upsert operation)."""
+        logger.debug(
+            "Upserting lesson", title=title, skill_level=skill_level.value, order_index=order_index
+        )
+
+        async with self.session_maker() as session:
+            # Use insert with on_conflict_do_update for upsert
+            stmt = (
+                insert(Lesson)
+                .values(
+                    title=title,
+                    skill_level=skill_level,
+                    order_index=order_index,
+                    tags=tags,
+                    theory_content=theory_content,
+                    examples=examples,
+                    exercises=exercises,
+                    updated_at=datetime.utcnow(),
+                )
+                .on_conflict_do_update(
+                    index_elements=["title"],  # Conflict on title (assuming title is unique)
+                    set_={
+                        "skill_level": skill_level,
+                        "order_index": order_index,
+                        "tags": tags,
+                        "theory_content": theory_content,
+                        "examples": examples,
+                        "exercises": exercises,
+                        "updated_at": datetime.utcnow(),
+                    },
+                )
+            )
+
+            await session.execute(stmt)
+            await session.commit()
+
+            # Fetch the upserted lesson
+            result = await session.execute(select(Lesson).where(Lesson.title == title))
+            lesson = result.scalar_one()
+            logger.debug("Lesson upserted successfully", title=title, id=lesson.id)
             return lesson
 
 

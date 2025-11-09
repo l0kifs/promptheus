@@ -19,6 +19,7 @@ from promptheus.data.async_repositories import (
     AsyncSessionRepository,
     AsyncUserRepository,
 )
+from promptheus.data.lesson_loader import LessonLoaderService
 
 
 class DependencyContainer:
@@ -134,6 +135,14 @@ class DependencyContainer:
         """Get ProgressTracker with repository."""
         progress_repo = await self.get_progress_repository()
         return ProgressTracker(progress_repo)
+
+    async def get_lesson_loader_service(self) -> LessonLoaderService:
+        """Get LessonLoaderService with dependencies."""
+        lesson_repo = await self.get_lesson_repository()
+        return LessonLoaderService(
+            settings=get_settings(),
+            lesson_repo=lesson_repo,
+        )
 
     def get_rate_limit_service(self) -> RateLimitService:
         """Get RateLimitService."""

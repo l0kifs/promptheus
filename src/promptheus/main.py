@@ -203,10 +203,26 @@ async def main() -> None:
     try:
         container = DependencyContainer.get_instance()
         await container.initialize()
-        handlers = await container.get_bot_handlers()
         logger.info("Components initialized successfully")
     except Exception as e:
         logger.critical("Failed to initialize components", error=str(e))
+        return
+
+    # Load lessons from content directory
+    logger.info("Loading lessons from content directory")
+    try:
+        lesson_loader = await container.get_lesson_loader_service()
+        loaded_count = await lesson_loader.batch_load_all()
+        logger.info("Lessons loaded successfully", count=loaded_count)
+    except Exception as e:
+        logger.critical("Failed to load lessons, exiting", error=str(e))
+        return
+
+    # Get bot handlers
+    try:
+        handlers = await container.get_bot_handlers()
+    except Exception as e:
+        logger.critical("Failed to initialize bot handlers", error=str(e))
         return
 
     # Create application

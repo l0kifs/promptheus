@@ -1,6 +1,7 @@
 """Application settings using Pydantic."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, computed_field, field_validator, model_validator
@@ -49,6 +50,12 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="sqlite:///./data/promptheus.db",
         description="Database connection URL",
+    )
+
+    # Lessons Content
+    lessons_content_path: Path = Field(
+        default=Path("../promptheus-content/lessons"),
+        description="Path to lessons content directory",
     )
 
     # Application
@@ -149,6 +156,24 @@ class Settings(BaseSettings):
             raise ConfigurationError(
                 f"Invalid API server port: must be between 1 and 65535, got {v}",
                 details={"field": "api_server_port", "value": v, "valid_range": "1-65535"},
+            )
+        return v
+
+    @field_validator("lessons_content_path")
+    @classmethod
+    def validate_lessons_content_path(cls, v: Path) -> Path:
+        """Validate that lessons content path exists and is a directory."""
+        from promptheus.core.exceptions import ConfigurationError
+
+        if not v.exists():
+            raise ConfigurationError(
+                f"Lessons content path does not exist: {v}",
+                details={"field": "lessons_content_path", "path": str(v), "exists": False},
+            )
+        if not v.is_dir():
+            raise ConfigurationError(
+                f"Lessons content path is not a directory: {v}",
+                details={"field": "lessons_content_path", "path": str(v), "is_directory": False},
             )
         return v
 

@@ -140,12 +140,11 @@ docker compose build
 
 **Step 4: Database Initialization**
 ```bash
-# Apply migrations
+# Apply migrations (includes lesson schema updates)
 alembic upgrade head
 
-# Seed initial data (lessons) - requires private content repo
-# Clone private repo: git clone https://github.com/l0kifs/promptheus-content.git
-python ../promptheus-content/scripts/seed_lessons.py
+# Note: Lesson content is now loaded automatically from JSON files
+# No separate seeding step required after initial migration
 ```
 
 **Step 5: Application Start**
@@ -203,11 +202,19 @@ alembic upgrade head --sql  # Dry-run
 # Pull latest code
 git pull origin main
 
+# Pull latest lesson content (if content repo updated)
+cd ../promptheus-content
+git pull origin main
+cd ../promptheus
+
 # Rebuild containers (if dependency changes)
 docker compose build
 
-# Apply migrations
+# Apply database migrations
 docker compose run --rm app alembic upgrade head
+
+# Note: Lesson content changes are loaded automatically on startup
+# File watcher detects changes and reloads content without restart
 
 # Rolling update
 docker compose up -d --no-deps --build app
@@ -237,35 +244,43 @@ docker compose up -d --no-deps --build app
 alembic downgrade -1
 ```
 
-#### 4.4 Database Migrations
+#### 4.4 Lesson Content Management
 
-**Creating a migration**:
-```bash
-# Generate migration
-alembic revision --autogenerate -m "description"
-
-# Check SQL
-alembic upgrade head --sql
-
-# Apply
-alembic upgrade head
+**Content Repository Structure**:
+```
+promptheus-content/
+├── lessons/
+│   ├── beginner/*.json
+│   ├── intermediate/*.json
+│   └── advanced/*.json
+├── docs/
+│   ├── lesson-catalog.md
+│   └── content-workflow.md
+└── README.md
 ```
 
-**Rolling back a migration**:
-```bash
-# Rollback last migration
-alembic downgrade -1
+**Content Updates**:
+- Content changes are detected automatically via file watcher
+- No application restart required for lesson updates
+- Version history maintained for all content changes
+- Hot reload enabled in development, disabled in production
 
-# Rollback to specific version
-alembic downgrade <revision>
+**Content Deployment**:
+```bash
+# Update content (separate from application deployment)
+cd ../promptheus-content
+git pull origin main
+
+# Application detects changes automatically
+# Check logs for content reload confirmation
+docker compose logs -f app | grep "lesson.*loaded\|content.*updated"
 ```
 
-**Best practices**:
-- Test migrations locally with production-like data before deployment
-- Backup database before migrations
-- Reversible migrations (downgrade support)
-- Don't drop columns in same migration as creation (two-phase)
-- Validate migrations with `--sql` flag before applying
+**Content Validation**:
+- JSON schema validation on load
+- Slug uniqueness across skill levels
+- Required fields validation
+- Content hash verification for versions
 
 ### 5. Monitoring and System Health
 

@@ -23,6 +23,7 @@ class LessonHandlersMixin:
 
         # Load session context
         session_context = await self.learning_orchestrator.get_session_context(user_id)
+        session_context = dict(session_context)  # Make a copy to avoid modifying shared state
         # context.user_data.update(session_context)  # Removed: using DB session instead
 
         lesson = await self.learning_orchestrator.lesson_repo.find_by_id(lesson_id)
@@ -58,7 +59,7 @@ class LessonHandlersMixin:
         await update.callback_query.edit_message_text(
             self.formatter.format_lesson_start(
                 str(lesson.title),
-                lesson.order_index,  # type: ignore
+                lesson.position,  # type: ignore
             ),
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
@@ -132,6 +133,7 @@ class LessonHandlersMixin:
 
         # Load session context
         session_context = await self.learning_orchestrator.get_session_context(user_id)
+        session_context = dict(session_context)  # Make a copy to avoid modifying shared state
         # context.user_data.update(session_context)  # Removed: using DB session instead
 
         lesson = await self.learning_orchestrator.lesson_repo.find_by_id(lesson_id)
@@ -210,6 +212,7 @@ class LessonHandlersMixin:
 
         # Load session context
         session_context = await self.learning_orchestrator.get_session_context(user_id)
+        session_context = dict(session_context)  # Make a copy to avoid modifying shared state
 
         # Get current chunk from session context
         current_chunk = session_context.get("theory_chunk", 0)
@@ -270,6 +273,7 @@ class LessonHandlersMixin:
 
         # Load session context
         session_context = await self.learning_orchestrator.get_session_context(user_id)
+        session_context = dict(session_context)  # Make a copy to avoid modifying shared state
 
         # Get current chunk from session context
         current_chunk = session_context.get("theory_chunk", 0)
@@ -390,7 +394,7 @@ class LessonHandlersMixin:
 
         keyboard = [
             [InlineKeyboardButton("Continue to Practice ➡️", callback_data=f"practice_{lesson_id}")],
-            [InlineKeyboardButton("⬅️ Back to Theory", callback_data=f"theory_prev_{lesson_id}")],
+            [InlineKeyboardButton("⬅️ Back to Theory", callback_data=f"lesson_start_{lesson_id}")],
         ]
 
         example_text = "📊 *Examples*\n\n"
@@ -436,7 +440,7 @@ class LessonHandlersMixin:
         # Get next lesson
         next_lesson = await self.learning_orchestrator.lesson_repo.find_next_lesson(
             current_lesson.skill_level,  # type: ignore
-            current_lesson.order_index,  # type: ignore
+            current_lesson.position,  # type: ignore
         )
 
         if next_lesson:

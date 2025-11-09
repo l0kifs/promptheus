@@ -81,7 +81,7 @@ class TestLessonFlowE2E:
             {
                 "id": 1,
                 "title": "Introduction to Prompt Engineering",
-                "order_index": 1,
+                "position": 1,
                 "skill_level": "beginner",
                 "theory_content": {
                     "sections": [

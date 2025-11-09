@@ -1,6 +1,7 @@
 """Base handlers for Telegram bot."""
 
 import math
+import traceback
 
 import httpx
 from loguru import logger
@@ -83,9 +84,16 @@ class BaseBotHandlers:
         Returns:
             Error category: 'user_error', 'api_error', 'system_error'
         """
+        # Import SQLAlchemy exceptions
+        from sqlalchemy.exc import SQLAlchemyError
+
         # Network and API related errors
         if isinstance(error, (NetworkError, TimedOut, httpx.TimeoutException, httpx.ConnectError)):
             return "api_error"
+
+        # Database errors
+        elif isinstance(error, SQLAlchemyError):
+            return "system_error"
 
         # User input validation errors and business logic errors
         elif isinstance(error, (ValueError, KeyError, TypeError, ValidationError, BusinessError)):
@@ -167,6 +175,7 @@ class BaseBotHandlers:
             user_id=user_id,
             error_type=type(error).__name__,
             error_message=str(error),
+            traceback=traceback.format_exc(),
         )
 
         message = "🔧 An internal error occurred. We're already working on fixing it."

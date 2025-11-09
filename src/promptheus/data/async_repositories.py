@@ -1,3 +1,5 @@
+"""Async repository classes for database operations."""
+
 from datetime import datetime
 
 from loguru import logger
@@ -246,7 +248,6 @@ class AsyncLessonRepository:
                     theory_content=theory_content,
                     examples=examples,
                     exercises=exercises,
-                    updated_at=datetime.utcnow(),
                 )
                 .on_conflict_do_update(
                     index_elements=["title"],  # Conflict on title (assuming title is unique)
@@ -258,7 +259,6 @@ class AsyncLessonRepository:
                         "theory_content": theory_content,
                         "examples": examples,
                         "exercises": exercises,
-                        "updated_at": datetime.utcnow(),
                     },
                 )
             )

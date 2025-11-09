@@ -72,7 +72,7 @@ class TestLessonHandlers:
         # Mock lesson
         mock_lesson = mocker.Mock()
         mock_lesson.title = "Test Lesson"
-        mock_lesson.order_index = 1
+        mock_lesson.position = 1
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = mock_lesson
 
         # Mock session operations
@@ -109,6 +109,9 @@ class TestLessonHandlers:
         """Test lesson callback when lesson not found."""
         # Mock lesson not found
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = None
+
+        # Mock session context
+        mock_handlers.learning_orchestrator.get_session_context.return_value = {}
 
         # Mock callback operations
         mock_callback_update.callback_query.answer = mocker.AsyncMock()
@@ -194,7 +197,7 @@ class TestLessonHandlers:
         # Mock lesson with theory content
         mock_lesson = mocker.Mock()
         mock_lesson.title = "Test Lesson"
-        mock_lesson.order_index = 1
+        mock_lesson.position = 1
         mock_lesson.theory_content = {
             "sections": [{"content": "Section 1"}, {"content": "Section 2"}]
         }
@@ -486,7 +489,7 @@ class TestLessonHandlers:
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.title = "Completed Lesson"
         mock_current_lesson.skill_level = SkillLevel.BEGINNER
-        mock_current_lesson.order_index = 1
+        mock_current_lesson.position = 1
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )
@@ -526,7 +529,7 @@ class TestLessonHandlers:
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.title = "Last Lesson"
         mock_current_lesson.skill_level = SkillLevel.BEGINNER
-        mock_current_lesson.order_index = 5
+        mock_current_lesson.position = 5
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )

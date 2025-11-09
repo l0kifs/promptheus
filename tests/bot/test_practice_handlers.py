@@ -160,7 +160,7 @@ class TestPracticeHandlers:
 
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.skill_level = mocker.Mock()
-        mock_current_lesson.order_index = 1
+        mock_current_lesson.position = 1
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )
@@ -196,7 +196,7 @@ class TestPracticeHandlers:
 
         mock_current_lesson = mocker.Mock()
         mock_current_lesson.skill_level = mocker.Mock()
-        mock_current_lesson.order_index = 5
+        mock_current_lesson.position = 5
         mock_handlers.learning_orchestrator.lesson_repo.find_by_id.return_value = (
             mock_current_lesson
         )

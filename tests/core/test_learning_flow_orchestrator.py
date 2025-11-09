@@ -27,9 +27,9 @@ class TestLearningFlowOrchestrator:
         # Mock user and lessons
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
         mock_lessons = [
-            type("MockLesson", (), {"id": 1, "title": "Lesson 1", "order_index": 1})(),
-            type("MockLesson", (), {"id": 2, "title": "Lesson 2", "order_index": 2})(),
-            type("MockLesson", (), {"id": 3, "title": "Lesson 3", "order_index": 3})(),
+            type("MockLesson", (), {"id": 1, "title": "Lesson 1", "position": 1})(),
+            type("MockLesson", (), {"id": 2, "title": "Lesson 2", "position": 2})(),
+            type("MockLesson", (), {"id": 3, "title": "Lesson 3", "position": 3})(),
         ]
 
         orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
@@ -50,10 +50,8 @@ class TestLearningFlowOrchestrator:
 
         # Mock user and lessons
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
-        mock_current_lesson = type("MockLesson", (), {"order_index": 1})()
-        mock_next_lesson = type(
-            "MockLesson", (), {"id": 2, "title": "Lesson 2", "order_index": 2}
-        )()
+        mock_current_lesson = type("MockLesson", (), {"position": 1})()
+        mock_next_lesson = type("MockLesson", (), {"id": 2, "title": "Lesson 2", "position": 2})()
 
         orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
         orchestrator.lesson_repo.find_by_id.return_value = mock_current_lesson
@@ -73,7 +71,7 @@ class TestLearningFlowOrchestrator:
 
         # Mock user and lessons
         mock_user = type("MockUser", (), {"skill_level": SkillLevel.BEGINNER})()
-        mock_current_lesson = type("MockLesson", (), {"order_index": 3})()
+        mock_current_lesson = type("MockLesson", (), {"position": 3})()
 
         orchestrator.user_repo.find_by_telegram_id.return_value = mock_user
         orchestrator.lesson_repo.find_by_id.return_value = mock_current_lesson

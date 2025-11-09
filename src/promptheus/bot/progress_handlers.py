@@ -63,28 +63,88 @@ class ProgressHandlersMixin:
                 )
                 return
 
-        # Fallback to user.current_lesson_id if no session context
-        current_lesson_id = user.current_lesson_id  # type: ignore
-        if current_lesson_id is not None:
-            # Resume current lesson
-            lesson = await self.learning_orchestrator.lesson_repo.find_by_id(current_lesson_id)
+        # No active session, determine next lesson based on progress
+        progress_records = await self.progress_tracker.progress_repo.find_by_user(user_id)
 
-            if lesson:
+        # Find lesson with IN_PROGRESS status
+        in_progress_lesson = None
+        for progress in progress_records:
+            if progress.status == LessonStatus.IN_PROGRESS:
+                in_progress_lesson = await self.learning_orchestrator.lesson_repo.find_by_id(
+                    progress.lesson_id
+                )
+                break
+
+        if in_progress_lesson:
+            # Resume in-progress lesson
+            keyboard = [
+                [InlineKeyboardButton("▶️ Resume", callback_data=f"lesson_{in_progress_lesson.id}")],
+                [InlineKeyboardButton("📋 All Lessons", callback_data="lesson_list")],
+                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
+            ]
+
+            await update.callback_query.edit_message_text(
+                f"📖 *Continue Learning*\n\nResume with:\n{in_progress_lesson.title}",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown",
+            )
+            return
+
+        # No in-progress lesson, find next NOT_STARTED lesson
+        all_lessons = await self.learning_orchestrator.lesson_repo.find_by_skill_level(
+            user.skill_level
+        )
+        completed_or_started_lesson_ids = {p.lesson_id for p in progress_records}
+
+        next_lesson = None
+        for lesson in all_lessons:
+            if lesson.id not in completed_or_started_lesson_ids:
+                next_lesson = lesson
+                break
+
+        if next_lesson:
+            # Start next available lesson
+            keyboard = [
+                [InlineKeyboardButton("▶️ Start", callback_data=f"lesson_{next_lesson.id}")],
+                [InlineKeyboardButton("📋 All Lessons", callback_data="lesson_list")],
+                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
+            ]
+
+            await update.callback_query.edit_message_text(
+                f"📖 *Continue Learning*\n\nNext lesson:\n{next_lesson.title}",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown",
+            )
+            return
+
+        # All lessons completed, show last completed lesson
+        completed_lessons = [p for p in progress_records if p.status == LessonStatus.COMPLETED]
+
+        if completed_lessons:
+            # Sort by completion date (most recent first) or by lesson position
+            completed_lessons.sort(key=lambda p: p.completed_at or p.lesson.position, reverse=True)
+            last_completed_progress = completed_lessons[0]
+            last_lesson = await self.learning_orchestrator.lesson_repo.find_by_id(
+                last_completed_progress.lesson_id
+            )
+
+            if last_lesson:
                 keyboard = [
-                    [InlineKeyboardButton("▶️ Resume", callback_data=f"lesson_{lesson.id}")],
+                    [InlineKeyboardButton("🔄 Review", callback_data=f"lesson_{last_lesson.id}")],
+                    [InlineKeyboardButton("📊 Progress", callback_data="progress")],
                     [InlineKeyboardButton("📋 All Lessons", callback_data="lesson_list")],
                     [InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu")],
                 ]
 
                 await update.callback_query.edit_message_text(
-                    f"📖 *Resume Learning*\n\nContinue with:\n{lesson.title}",
+                    f"🎉 *All Lessons Completed!*\n\nLast completed:\n{last_lesson.title}\n\nWant to review or check your progress?",
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode="Markdown",
                 )
                 return
 
-        # No current lesson, show lesson list
-        lessons = await self.learning_orchestrator.lesson_repo.find_by_skill_level(user.skill_level)  # type: ignore
+        # Fallback: show lesson list
+        lessons = await self.learning_orchestrator.lesson_repo.find_by_skill_level(user.skill_level)
         if not lessons:
             lessons = await self.learning_orchestrator.lesson_repo.find_by_skill_level(
                 SkillLevel.BEGINNER

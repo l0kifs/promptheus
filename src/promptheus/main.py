@@ -62,20 +62,13 @@ async def start_api_server(settings: Settings) -> None:
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         """Lifespan context manager for FastAPI app."""
-        # Startup: Start file watcher
-        try:
-            file_watcher = await container.get_file_watcher()
-            await file_watcher.start()
-            logger.info("File watcher started successfully")
-        except Exception as e:
-            logger.error("Failed to start file watcher", error=str(e))
-            # Don't fail startup if file watcher fails, just log
-
+        # File watcher is now started in main() after lesson loading
+        # No startup actions needed here
         yield
 
         # Shutdown: Stop file watcher
         try:
-            file_watcher = await container.get_file_watcher()
+            file_watcher = container.get_file_watcher()
             await file_watcher.stop()
             logger.info("File watcher stopped successfully")
         except Exception as e:
@@ -245,6 +238,16 @@ async def main() -> None:
     except Exception as e:
         logger.critical("Failed to load lessons, exiting", error=str(e))
         return
+
+    # Start file watcher now that lessons are loaded and callback is set
+    logger.info("Starting file watcher for lesson content changes")
+    try:
+        file_watcher = container.get_file_watcher()
+        await file_watcher.start()
+        logger.info("File watcher started successfully")
+    except Exception as e:
+        logger.error("Failed to start file watcher", error=str(e))
+        # Don't fail startup if file watcher fails, just log
 
     # Get bot handlers
     try:

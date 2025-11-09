@@ -295,24 +295,6 @@ class TestLessonLoaderService:
         with pytest.raises(FileNotFoundError):
             await loader_service.load_lesson(Path("/nonexistent/file.json"))
 
-    def test_extract_order_index_with_number(self, loader_service):
-        """Test extracting order index from filename with number prefix."""
-        file_path = Path("01_test_lesson.json")
-        result = loader_service._extract_order_index(file_path)
-        assert result == 1
-
-    def test_extract_order_index_without_number(self, loader_service):
-        """Test extracting order index from filename without number prefix."""
-        file_path = Path("test_lesson.json")
-        result = loader_service._extract_order_index(file_path)
-        assert result == 999
-
-    def test_extract_order_index_invalid_format(self, loader_service):
-        """Test extracting order index from malformed filename."""
-        file_path = Path("invalid_format.json")
-        result = loader_service._extract_order_index(file_path)
-        assert result == 999
-
     @pytest.mark.asyncio
     async def test_batch_load_all_no_repo(self, loader_service):
         """Test batch_load_all without lesson repository."""
